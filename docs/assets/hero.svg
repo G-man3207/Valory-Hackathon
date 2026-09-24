@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="480" viewBox="0 0 1280 480" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">AI Incident Commander</title>
+  <desc id="desc">Four AI roles. One human decision. A Kubernetes incident moves from evidence to human approval to verified recovery.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#18181B"/>
+      <stop offset="1" stop-color="#09090B"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" stroke="#A1A1AA" stroke-opacity=".055"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="480" rx="20" fill="url(#bg)"/>
+  <rect width="1280" height="480" rx="20" fill="url(#grid)"/>
+  <rect x=".5" y=".5" width="1279" height="479" rx="19.5" stroke="#3F3F46"/>
+  <path d="M48 64H76" stroke="#FBBF24" stroke-width="4"/>
+  <text x="90" y="69" fill="#FBBF24" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14" letter-spacing="2">VALORY HACKATHON</text>
+  <text x="48" y="170" fill="#FAFAFA" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="700" letter-spacing="-2">AI Incident</text>
+  <text x="48" y="242" fill="#FAFAFA" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="700" letter-spacing="-2">Commander</text>
+  <text x="50" y="296" fill="#D4D4D8" font-family="Inter, Arial, sans-serif" font-size="22">Four AI roles. One human decision.</text>
+  <text x="50" y="334" fill="#A1A1AA" font-family="Inter, Arial, sans-serif" font-size="17">Real failures. Live evidence. Verified recovery.</text>
+  <path d="M48 389H1232" stroke="#3F3F46"/>
+  <text x="50" y="431" fill="#A1A1AA" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14" letter-spacing="1">IKON / C# / .NET 10 / KUBERNETES</text>
+  <circle cx="1030" cy="426" r="4" fill="#34D399"/>
+  <text x="1044" y="431" fill="#D4D4D8" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="13">ISOLATED LOCAL LAB</text>
+  <path d="M704 166V226M704 274V329" stroke="#52525B" stroke-width="2"/>
+  <path d="m699 215 5 6 5-6M699 318l5 6 5-6" stroke="#71717A" stroke-width="2"/>
+  <rect x="670" y="87" width="562" height="95" rx="10" fill="#18181B" stroke="#3F3F46"/>
+  <circle cx="704" cy="118" r="5" fill="#A1A1AA"/>
+  <text x="724" y="124" fill="#FAFAFA" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="600">Investigate the evidence</text>
+  <text x="697" y="155" fill="#A1A1AA" font-family="Inter, Arial, sans-serif" font-size="14">Observability → Hypothesis → Critic → Commander</text>
+  <rect x="670" y="226" width="562" height="48" rx="10" fill="#30250E" stroke="#A87916"/>
+  <circle cx="704" cy="250" r="5" fill="#FBBF24"/>
+  <text x="724" y="256" fill="#FDE68A" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="600">Human approval</text>
+  <text x="1056" y="255" fill="#E9C66E" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12">SMS OR LOCAL</text>
+  <rect x="670" y="328" width="562" height="36" rx="8" fill="#0A2822" stroke="#1E5E4D"/>
+  <path d="m698 346 4 4 8-9" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="724" y="352" fill="#A7F3D0" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="600">Restore → Verify → Report</text>
+</svg>
