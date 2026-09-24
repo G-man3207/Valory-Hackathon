@@ -94,15 +94,15 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
             _hypotheses.Value = string.Join("\n\n", hypotheses.Items.Select((item, index) => $"{index + 1}. {item.Title}\n{item.Support}\nUncertainty: {item.Uncertainty}"));
 
             var critique = await RunRoleAsync<CriticResult>("Critic",
-                "Challenge the leading diagnosis using actual evidence. Look for correlation mistaken for causality and missing connection ownership or dependency evidence. Do not manufacture contradictory timestamps. Empty MissingEvidence is allowed when sufficient evidence exists for a reversible mitigation.",
+                "Challenge the leading diagnosis using actual evidence. Look for correlation mistaken for causality and missing connection ownership or dependency evidence. Do not manufacture contradictory timestamps. MissingEvidence should list blockers to a reversible, human-approved mitigation, not every unanswered root-cause question. Exact code-level proof can remain uncertain and be a follow-up in Assessment. Tools return fixed snapshots; source code and more detailed transaction logs are unavailable. Empty MissingEvidence is allowed when sufficient evidence exists for a reversible mitigation.",
                 EvidenceContext() + "\nHypotheses: " + JsonSerializer.Serialize(hypotheses));
             if (string.IsNullOrWhiteSpace(critique.Assessment) || critique.MissingEvidence is null || critique.MissingEvidence.Any(string.IsNullOrWhiteSpace))
                 throw new InvalidOperationException("Invalid critique.");
             _critique.Value = critique.Assessment + "\n" + string.Join("\n", critique.MissingEvidence.Select(item => $"• {item}"));
 
             var decision = await RunRoleAsync<CommanderResult>("Commander",
-                "Choose NextStep: investigate, propose_rollback, or escalate. For investigate choose Tool from get_metrics, get_logs, get_recent_deployments, inspect_db_connections, get_dependency_health. Before proposing rollback you MUST inspect_db_connections to distinguish owners and evaluate the Critic. A proposal is NOT execution. Prefer new evidence over repeating a tool. Never claim resolution. Use Tool empty for other decisions.",
-                EvidenceContext() + "\nHypotheses: " + JsonSerializer.Serialize(hypotheses) + "\nCritic: " + JsonSerializer.Serialize(critique));
+                "Choose NextStep: investigate, propose_rollback, or escalate. For investigate choose an unread Tool from get_metrics, get_logs, get_recent_deployments, inspect_db_connections, get_dependency_health. Tools return fixed snapshots: rereading get_logs cannot produce detailed transaction logs, source code, or new evidence. Before proposing rollback you MUST inspect_db_connections to distinguish owners and evaluate the Critic. After reading relevant evidence, decide whether it supports a reversible rollback for human review; exact code-level proof is not required, but conflicting evidence must be addressed. If it does not support mitigation, escalate. A proposal is NOT execution. Never claim resolution. Use Tool empty for other decisions.",
+                $"Investigation round {round + 1} of 3.\n" + EvidenceContext() + "\nHypotheses: " + JsonSerializer.Serialize(hypotheses) + "\nCritic: " + JsonSerializer.Serialize(critique));
             if (string.IsNullOrWhiteSpace(decision.Rationale)) throw new InvalidOperationException("Missing rationale.");
             _decision.Value = decision.Rationale;
             Record("Commander", decision.Rationale);
@@ -133,12 +133,14 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
                     if (_simulation.PendingApproval is { } pending) _ = PollApprovalAsync(pending);
                     return;
                 case "escalate":
+                    _smsStatus.Value = "No approval SMS sent: investigation escalated without a rollback proposal.";
                     _simulation.Escalate(decision.Rationale);
                     return;
                 default:
                     throw new InvalidOperationException("Unsupported or premature decision.");
             }
         }
+        _smsStatus.Value = "No approval SMS sent: investigation reached its three-round limit without a rollback proposal.";
         _simulation.Escalate("Three-round investigation limit reached. Operator review required.");
     }
 
