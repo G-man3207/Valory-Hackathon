@@ -11,5 +11,5 @@ npm --prefix IncidentCommander/frontend-node run lint
 npm --prefix IncidentCommander/frontend-node run typecheck
 npm --prefix IncidentCommander/frontend-node run build
 dotnet build "$app" --configuration Release --warnaserror
-dotnet format "$app" whitespace --verify-no-changes --no-restore
+dotnet csharpier check IncidentCommander/app/IncidentCommander/*.cs IncidentCommander/checks/*.cs
 dotnet run --project IncidentCommander/checks/IncidentCommander.Checks.csproj --configuration Release

@@ -8,12 +8,19 @@ Install Ikon using its official installer and run `ikon login`. The project uses
 
 ```sh
 npm ci --prefix IncidentCommander/frontend-node
+dotnet tool restore
 ./verify.sh
 cd IncidentCommander
 ikon app run --no-auto-frontend-login
 ```
 
-`verify.sh` runs locally and requires zero ESLint warnings, strict TypeScript, a frontend build, a C# build with warnings as errors, clean C# whitespace, and executable domain/SMS checks. The generated SDK frontend currently emits a bundle-size advisory. The backend build needs the authenticated Ikon package feed.
+`verify.sh` runs locally and requires zero ESLint warnings, strict TypeScript, a frontend build, a C# build with warnings as errors, CSharpier formatting, and executable domain/SMS checks. The generated SDK frontend currently emits a bundle-size advisory. The backend build needs the authenticated Ikon package feed.
+
+Format C# with the repository's pinned formatter:
+
+```sh
+dotnet csharpier format IncidentCommander/app/IncidentCommander/*.cs IncidentCommander/checks/*.cs
+```
 
 ## Demo
 

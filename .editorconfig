@@ -11,9 +11,5 @@ trim_trailing_whitespace = true
 [*.{cs,py}]
 indent_size = 4
 
-[*.cs]
-csharp_preserve_single_line_blocks = false
-csharp_preserve_single_line_statements = false
-
 [*.md]
 trim_trailing_whitespace = false

@@ -3,10 +3,23 @@ using System.Text.Json;
 
 public enum IncidentPhase
 {
-    Healthy, Investigating, WaitingForApproval, Executing, Verifying, Resolved, Escalated
+    Healthy,
+    Investigating,
+    WaitingForApproval,
+    Executing,
+    Verifying,
+    Resolved,
+    Escalated,
 }
+
 public sealed record IncidentEvent(DateTimeOffset At, string Actor, string Message);
-public sealed record ApprovalRequest(string Code, string IncidentId, string DeploymentId, DateTimeOffset ExpiresAt);
+
+public sealed record ApprovalRequest(
+    string Code,
+    string IncidentId,
+    string DeploymentId,
+    DateTimeOffset ExpiresAt
+);
 
 public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
 {
@@ -14,10 +27,7 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     private readonly List<IncidentEvent> _events = [];
     private readonly Lock _eventGate = new();
     private DateTimeOffset _startedAt;
-    public IncidentPhase Phase
-    {
-        get; private set;
-    }
+    public IncidentPhase Phase { get; private set; }
     public string Id { get; private set; } = "";
     public string DeploymentId { get; private set; } = "7e30b1";
     public double ErrorRate { get; private set; } = 0.002;
@@ -25,7 +35,8 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     public double ConnectionUsage { get; private set; } = 0.42;
     public (double ErrorRate, int LatencyMs, double ConnectionUsage)? BeforeRecovery
     {
-        get; private set;
+        get;
+        private set;
     }
     public IReadOnlyList<IncidentEvent> Events
     {
@@ -37,15 +48,17 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
             }
         }
     }
-    public ApprovalRequest? PendingApproval
-    {
-        get; private set;
-    }
+    public ApprovalRequest? PendingApproval { get; private set; }
 
     public void Inject()
     {
-        if (Phase is not (IncidentPhase.Healthy or IncidentPhase.Resolved or IncidentPhase.Escalated))
-            throw new InvalidOperationException("Reset or finish the current incident before starting another.");
+        if (
+            Phase
+            is not (IncidentPhase.Healthy or IncidentPhase.Resolved or IncidentPhase.Escalated)
+        )
+            throw new InvalidOperationException(
+                "Reset or finish the current incident before starting another."
+            );
         Reset();
         Id = Guid.NewGuid().ToString("N");
         _startedAt = _time.GetUtcNow();
@@ -93,9 +106,9 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
                 {
                     error_rate = 0.002,
                     p95_latency_ms = 180,
-                    db_connection_usage = 0.42
+                    db_connection_usage = 0.42,
                 },
-                request_rate_change = 0.03
+                request_rate_change = 0.03,
             },
             "get_logs" => new
             {
@@ -106,9 +119,13 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
                     ? new[]
                     {
                         "Timeout acquiring PostgreSQL connection after 3000ms",
-                        "POST /checkout returned 503: connection pool exhausted"
+                        "POST /checkout returned 503: connection pool exhausted",
                     }
-                    : new[] { "POST /checkout returned 200", "PostgreSQL connection acquired in 4ms" }
+                    : new[]
+                    {
+                        "POST /checkout returned 200",
+                        "PostgreSQL connection acquired in 4ms",
+                    },
             },
             "get_recent_deployments" => new
             {
@@ -117,9 +134,11 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
                 service = "checkout-api",
                 deployment_id = DeploymentId,
                 previous_deployment_id = "7e30b1",
-                completed_at = Id.Length == 0 ? observedAt.AddHours(-2) : _startedAt.AddMinutes(-11),
+                completed_at = Id.Length == 0
+                    ? observedAt.AddHours(-2)
+                    : _startedAt.AddMinutes(-11),
                 alert_started_at = Id.Length == 0 ? (DateTimeOffset?)null : _startedAt,
-                changes = new[] { "Checkout database session handling", "Request tracing" }
+                changes = new[] { "Checkout database session handling", "Request tracing" },
             },
             "inspect_db_connections" => new
             {
@@ -131,7 +150,9 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
                 checkout_idle_in_transaction = degraded ? 142 : 2,
                 other_services_stable = true,
                 cpu_usage = 0.31,
-                observation = degraded ? "Checkout sessions continue accumulating at steady request volume." : "Session counts are stable."
+                observation = degraded
+                    ? "Checkout sessions continue accumulating at steady request volume."
+                    : "Session counts are stable.",
             },
             "get_dependency_health" => new
             {
@@ -139,9 +160,9 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
                 observed_at = observedAt,
                 payments = "healthy",
                 inventory = "healthy",
-                database_reachable = true
+                database_reachable = true,
             },
-            _ => throw new ArgumentException("Unknown investigation tool.", nameof(name))
+            _ => throw new ArgumentException("Unknown investigation tool.", nameof(name)),
         };
         return JsonSerializer.Serialize(evidence);
     }
@@ -159,8 +180,12 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     public void ProposeRollback()
     {
         RequirePhase(IncidentPhase.Investigating);
-        PendingApproval = new(Convert.ToHexString(RandomNumberGenerator.GetBytes(6)), Id, DeploymentId,
-            _time.GetUtcNow().AddMinutes(5));
+        PendingApproval = new(
+            Convert.ToHexString(RandomNumberGenerator.GetBytes(6)),
+            Id,
+            DeploymentId,
+            _time.GetUtcNow().AddMinutes(5)
+        );
         Phase = IncidentPhase.WaitingForApproval;
         Record("Commander", $"Rollback of {DeploymentId} proposed; waiting for human approval.");
     }
@@ -169,18 +194,26 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         RequirePhase(IncidentPhase.WaitingForApproval);
-        var pending = PendingApproval ?? throw new InvalidOperationException("No action is awaiting approval.");
+        var pending =
+            PendingApproval
+            ?? throw new InvalidOperationException("No action is awaiting approval.");
         if (pending.ExpiresAt <= _time.GetUtcNow())
         {
             Escalate("Approval expired; no action executed.");
             throw new InvalidOperationException("Approval expired.");
         }
-        if (pending.IncidentId != Id || pending.DeploymentId != DeploymentId ||
-            !string.Equals(pending.Code, code, StringComparison.Ordinal))
+        if (
+            pending.IncidentId != Id
+            || pending.DeploymentId != DeploymentId
+            || !string.Equals(pending.Code, code, StringComparison.Ordinal)
+        )
             throw new InvalidOperationException("Approval does not match the pending action.");
         PendingApproval = null;
         Phase = approved ? IncidentPhase.Executing : IncidentPhase.Escalated;
-        Record("Human", approved ? "Rollback approved." : "Rollback denied; manual investigation required.");
+        Record(
+            "Human",
+            approved ? "Rollback approved." : "Rollback denied; manual investigation required."
+        );
     }
 
     public void Rollback()
@@ -204,7 +237,10 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
             return;
         }
         Phase = IncidentPhase.Resolved;
-        Record("Verifier", "Error rate, latency and database utilization meet recovery thresholds.");
+        Record(
+            "Verifier",
+            "Error rate, latency and database utilization meet recovery thresholds."
+        );
     }
 
     public void Escalate(string reason)
@@ -218,6 +254,8 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     private void RequirePhase(IncidentPhase expected)
     {
         if (Phase != expected)
-            throw new InvalidOperationException($"Action requires {expected}; current phase is {Phase}.");
+            throw new InvalidOperationException(
+                $"Action requires {expected}; current phase is {Phase}."
+            );
     }
 }
