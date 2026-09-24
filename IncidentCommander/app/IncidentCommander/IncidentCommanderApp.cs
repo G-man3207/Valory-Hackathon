@@ -139,15 +139,17 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
             var observations = await RunRoleAsync<ObservationResult>(
                 "Observability",
                 "Collect supported facts without diagnosing. On the first round inspect metrics, logs, "
-                    + "deployments and dependency health using tools. Never invent readings.",
+                    + "deployments and dependency health using tools. Return 6–10 concise, non-empty facts. Never invent readings.",
                 EvidenceContext(),
                 true
             );
             if (
-                observations.Facts is not { Length: > 0 and <= 12 }
+                observations.Facts is not { Length: > 0 }
                 || observations.Facts.Any(string.IsNullOrWhiteSpace)
             )
-                throw new InvalidOperationException("Invalid observation result.");
+                throw new InvalidOperationException(
+                    $"Observability returned invalid facts: count={observations.Facts?.Length ?? 0}, blank={observations.Facts?.Count(string.IsNullOrWhiteSpace) ?? 0}."
+                );
             _observations.Value = string.Join("\n", observations.Facts.Select(fact => $"- {fact}"));
 
             var hypotheses = await RunRoleAsync<HypothesisResult>(
@@ -216,7 +218,7 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
                 throw new InvalidOperationException("Missing rationale.");
             _decision.Value = decision.Rationale;
             Record("Commander", decision.Rationale);
-            switch (decision.NextStep)
+            switch (decision.NextStep?.Trim().ToLowerInvariant())
             {
                 case "investigate":
                     await ReadEvidenceAsync(decision.Tool);
@@ -251,7 +253,9 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
                     _incident.Escalate(decision.Rationale);
                     return;
                 default:
-                    throw new InvalidOperationException("Unsupported or premature decision.");
+                    throw new InvalidOperationException(
+                        $"Unsupported Commander decision: step={decision.NextStep}; tool={decision.Tool}; routesRead={_evidence.ContainsKey("inspect_service_routes")}."
+                    );
             }
         }
         _smsStatus.Value =
@@ -322,6 +326,8 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
 
     private async Task<string> ReadEvidenceAsync(string name)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        name = name.Trim().ToLowerInvariant();
         var result = await _lab.ReadToolAsync(name, _shutdown.Token);
         lock (_evidence)
         {
