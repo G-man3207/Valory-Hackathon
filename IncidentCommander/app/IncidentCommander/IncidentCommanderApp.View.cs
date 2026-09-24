@@ -10,9 +10,12 @@ public partial class IncidentCommanderApp
             content: view =>
             {
                 _ = _revision.Value;
-                var phase = _simulation.Phase;
+                var phase = _incident.Phase;
                 var busy = _busy.Value;
-                var healthy = phase is IncidentPhase.Healthy or IncidentPhase.Resolved;
+                var metrics = _incident.Metrics;
+                var healthy =
+                    phase == IncidentPhase.Resolved
+                    || phase == IncidentPhase.Healthy && metrics is { ErrorRate: 0 };
                 view.ScrollArea(
                     rootStyle: ["h-screen w-full"],
                     content: view =>
@@ -35,7 +38,7 @@ public partial class IncidentCommanderApp
                                                 );
                                                 view.Text(
                                                     ["text-xs text-zinc-400"],
-                                                    text: "Simulated infrastructure · Human-approved remediation"
+                                                    text: "Real isolated Kubernetes lab · No production systems"
                                                 );
                                             }
                                         );
@@ -59,8 +62,8 @@ public partial class IncidentCommanderApp
                                                     view.Button(
                                                         [Button.PrimaryMd, "min-h-11"],
                                                         text: _sms is not null
-                                                            ? "Inject incident & request SMS"
-                                                            : "Inject incident",
+                                                            ? "Inject Kubernetes fault & request SMS"
+                                                            : "Inject Kubernetes fault",
                                                         disabled: busy,
                                                         onClick: InjectAsync
                                                     );
@@ -72,10 +75,27 @@ public partial class IncidentCommanderApp
                                                         text: "Reset demo",
                                                         disabled: busy,
                                                         onClick: ResetAsync,
-                                                        tooltip: "Clears this run and invalidates its approval."
+                                                        tooltip: "Restores the lab inventory URL, clears this run and invalidates approval."
                                                     );
                                                 }
                                             }
+                                        );
+                                    }
+                                );
+
+                                view.Column(
+                                    ["gap-2"],
+                                    content: view =>
+                                    {
+                                        view.Heading(
+                                            ["text-base font-semibold"],
+                                            text: "Scenario: Ready pods, failing checkouts"
+                                        );
+                                        view.Text(
+                                            ["text-sm text-zinc-300 leading-relaxed max-w-prose"],
+                                            text: "In the local kind cluster's incident-lab namespace, checkout calls inventory. "
+                                                + "The injected deployment points checkout at a nonexistent inventory DNS name: requests return HTTP 503 while the pod stays Ready. "
+                                                + "The agents inspect real logs and configuration. Human approval restores the known inventory URL, then live HTTP probes verify recovery."
                                         );
                                     }
                                 );
@@ -100,9 +120,11 @@ public partial class IncidentCommanderApp
                                                         view.Icon(
                                                             [
                                                                 "w-4 h-4",
-                                                                healthy
-                                                                    ? "text-emerald-400"
-                                                                    : "text-amber-400",
+                                                                healthy ? "text-emerald-400"
+                                                                : phase == IncidentPhase.Healthy
+                                                                && metrics is null
+                                                                    ? "text-zinc-400"
+                                                                : "text-amber-400",
                                                             ],
                                                             name: healthy
                                                                 ? "shield-check"
@@ -111,17 +133,20 @@ public partial class IncidentCommanderApp
                                                         view.Text(
                                                             ["font-semibold text-sm"],
                                                             text: phase
-                                                            == IncidentPhase.WaitingForApproval
-                                                                ? "Awaiting human approval"
+                                                                == IncidentPhase.WaitingForApproval
+                                                                    ? "Awaiting human approval"
+                                                                : phase == IncidentPhase.Healthy
+                                                                && metrics is null
+                                                                    ? "Ready to investigate"
                                                                 : phase.ToString()
                                                         );
                                                     }
                                                 );
                                                 view.Text(
                                                     ["text-xs text-zinc-400 font-mono break-all"],
-                                                    text: string.IsNullOrEmpty(_simulation.Id)
+                                                    text: string.IsNullOrEmpty(_incident.Id)
                                                         ? "No active incident"
-                                                        : _simulation.Id
+                                                        : _incident.Id
                                                 );
                                             }
                                         );
@@ -131,27 +156,30 @@ public partial class IncidentCommanderApp
                                             {
                                                 RenderMetric(
                                                     view,
-                                                    "Error rate",
-                                                    _simulation.ErrorRate.ToString(
+                                                    "Probe errors",
+                                                    metrics?.ErrorRate.ToString(
                                                         "P1",
                                                         CultureInfo.InvariantCulture
-                                                    ),
-                                                    _simulation.ErrorRate > 0.01
+                                                    ) ?? "Not checked",
+                                                    metrics is { ErrorRate: > 0 }
                                                 );
                                                 RenderMetric(
                                                     view,
-                                                    "P95 latency",
-                                                    $"{_simulation.LatencyMs.ToString("N0", CultureInfo.InvariantCulture)} ms",
-                                                    _simulation.LatencyMs > 500
+                                                    "Probe P95",
+                                                    metrics is null
+                                                        ? "Not checked"
+                                                        : $"{metrics.LatencyMs.ToString("N0", CultureInfo.InvariantCulture)} ms",
+                                                    metrics is { LatencyMs: > 500 }
                                                 );
                                                 RenderMetric(
                                                     view,
-                                                    "DB pool utilization",
-                                                    _simulation.ConnectionUsage.ToString(
-                                                        "P0",
-                                                        CultureInfo.InvariantCulture
-                                                    ),
-                                                    _simulation.ConnectionUsage > 0.8
+                                                    "Ready pods",
+                                                    metrics is null
+                                                        ? "Not checked"
+                                                        : $"{metrics.ReadyReplicas}/{metrics.DesiredReplicas}",
+                                                    metrics is not null
+                                                        && metrics.ReadyReplicas
+                                                            < metrics.DesiredReplicas
                                                 );
                                                 view.Column(
                                                     ["gap-1 min-w-0"],
@@ -165,7 +193,9 @@ public partial class IncidentCommanderApp
                                                             [
                                                                 "text-lg font-mono text-zinc-200 break-all",
                                                             ],
-                                                            text: _simulation.DeploymentId
+                                                            text: DeploymentLabel(
+                                                                _incident.DeploymentId
+                                                            )
                                                         );
                                                     }
                                                 );
@@ -178,7 +208,8 @@ public partial class IncidentCommanderApp
 
                                 if (
                                     phase == IncidentPhase.Resolved
-                                    && _simulation.BeforeRecovery is { } before
+                                    && _incident.BeforeRecovery is { } before
+                                    && metrics is { } after
                                 )
                                 {
                                     view.Column(
@@ -200,7 +231,7 @@ public partial class IncidentCommanderApp
                                             );
                                             view.Text(
                                                 ["text-xs text-emerald-200"],
-                                                text: "Simulated metrics immediately before rollback and after verification."
+                                                text: "Live lab probes and pod counts before restoration and after verification. Ready pods can remain unchanged during an application failure."
                                             );
                                             view.Box(
                                                 ["grid grid-cols-1 sm:grid-cols-3 gap-4"],
@@ -208,33 +239,27 @@ public partial class IncidentCommanderApp
                                                 {
                                                     RenderRecoveryMetric(
                                                         view,
-                                                        "Error rate",
+                                                        "Probe errors",
                                                         before.ErrorRate.ToString(
                                                             "P1",
                                                             CultureInfo.InvariantCulture
                                                         ),
-                                                        _simulation.ErrorRate.ToString(
+                                                        after.ErrorRate.ToString(
                                                             "P1",
                                                             CultureInfo.InvariantCulture
                                                         )
                                                     );
                                                     RenderRecoveryMetric(
                                                         view,
-                                                        "P95 latency",
+                                                        "Probe P95",
                                                         $"{before.LatencyMs.ToString("N0", CultureInfo.InvariantCulture)} ms",
-                                                        $"{_simulation.LatencyMs.ToString("N0", CultureInfo.InvariantCulture)} ms"
+                                                        $"{after.LatencyMs.ToString("N0", CultureInfo.InvariantCulture)} ms"
                                                     );
                                                     RenderRecoveryMetric(
                                                         view,
-                                                        "DB pool utilization",
-                                                        before.ConnectionUsage.ToString(
-                                                            "P0",
-                                                            CultureInfo.InvariantCulture
-                                                        ),
-                                                        _simulation.ConnectionUsage.ToString(
-                                                            "P0",
-                                                            CultureInfo.InvariantCulture
-                                                        )
+                                                        "Ready pods",
+                                                        $"{before.ReadyReplicas}/{before.DesiredReplicas}",
+                                                        $"{after.ReadyReplicas}/{after.DesiredReplicas}"
                                                     );
                                                 }
                                             );
@@ -287,17 +312,17 @@ public partial class IncidentCommanderApp
                                                             )
                                                     );
                                                 }
-                                                if (_simulation.PendingApproval is { } approval)
+                                                if (_incident.PendingApproval is { } approval)
                                                 {
                                                     view.Text(
                                                         ["text-sm text-zinc-200 leading-relaxed"],
-                                                        text: $"Roll back deployment {approval.DeploymentId}. This changes only the simulation."
+                                                        text: $"Restore the known inventory URL on {DeploymentLabel(approval.DeploymentId)}. This changes only checkout in the local incident-lab namespace."
                                                     );
                                                     view.Text(
                                                         ["text-xs text-zinc-400"],
                                                         text: _sms is null
-                                                            ? "Local demo approval · SMS not connected"
-                                                            : "Local demo approval · SMS fallback"
+                                                            ? "Local lab approval · SMS not connected"
+                                                            : "Local lab approval · SMS fallback"
                                                     );
                                                     view.Row(
                                                         [
@@ -332,13 +357,13 @@ public partial class IncidentCommanderApp
                                                         {
                                                             view.Button(
                                                                 [Button.PrimaryMd, "min-h-11"],
-                                                                text: "Approve rollback",
+                                                                text: "Approve restoration",
                                                                 disabled: busy,
                                                                 onClick: ApproveAsync
                                                             );
                                                             view.Button(
                                                                 [Button.OutlineMd, "min-h-11"],
-                                                                text: "Deny rollback",
+                                                                text: "Deny restoration",
                                                                 disabled: busy,
                                                                 onClick: DenyAsync
                                                             );
@@ -353,23 +378,23 @@ public partial class IncidentCommanderApp
                                                         {
                                                             IncidentPhase.Healthy
                                                                 when _sms is not null =>
-                                                                "Inject incident & request SMS starts a connection leak investigation "
-                                                                    + "and sends a real approval SMS if a rollback is proposed.",
+                                                                "Inject Kubernetes fault & request SMS deploys the bad inventory URL "
+                                                                    + "and sends a real approval SMS if restoration is proposed.",
                                                             IncidentPhase.Healthy =>
-                                                                "Inject a connection leak to start. The agents investigate before proposing an action.",
+                                                                "Inject the bad inventory URL into checkout to start. The agents investigate before proposing restoration.",
                                                             IncidentPhase.Resolved =>
                                                                 "Recovery verified. The incident report is ready below.",
                                                             IncidentPhase.Escalated =>
                                                                 "Human review required. No further remediation will run. "
                                                                     + "Review the evidence, then reset to try again.",
                                                             _ =>
-                                                                "The agents can propose a rollback. Only a human can authorize it.",
+                                                                "The agents can propose restoring the inventory URL. Only a human can authorize it.",
                                                         }
                                                     );
                                                 }
                                                 view.Text(
                                                     ["text-xs text-zinc-400"],
-                                                    text: "Reset demo clears this run and invalidates its approval."
+                                                    text: "Reset demo restores the lab inventory URL, clears this run and invalidates approval."
                                                 );
                                             }
                                         );
@@ -529,14 +554,14 @@ public partial class IncidentCommanderApp
                                                         );
                                                     }
                                                 );
-                                                if (_simulation.Events.Count == 0)
+                                                if (_incident.Events.Count == 0)
                                                 {
                                                     view.Text(
                                                         ["text-sm text-zinc-400 py-3"],
                                                         text: "Investigation steps and decisions will be recorded here."
                                                     );
                                                 }
-                                                foreach (var entry in _simulation.Events.Reverse())
+                                                foreach (var entry in _incident.Events.Reverse())
                                                 {
                                                     view.Row(
                                                         [
@@ -627,7 +652,7 @@ public partial class IncidentCommanderApp
             IncidentPhase.Healthy => ["Standby", "Pending", "Pending", "Pending"],
             IncidentPhase.Investigating => ["Detected", "In progress", "Pending", "Pending"],
             IncidentPhase.WaitingForApproval => ["Detected", "Reviewed", "Required", "Pending"],
-            IncidentPhase.Executing => ["Detected", "Reviewed", "Approved", "Rolling back"],
+            IncidentPhase.Executing => ["Detected", "Reviewed", "Approved", "Restoring"],
             IncidentPhase.Verifying => ["Detected", "Reviewed", "Approved", "Verifying"],
             IncidentPhase.Resolved => ["Detected", "Reviewed", "Approved", "Verified"],
             _ => ["Detected", "Stopped", "Closed", "Not verified"],
@@ -709,7 +734,8 @@ public partial class IncidentCommanderApp
             props: new Dictionary<string, object>
             {
                 ["role"] = "group",
-                ["aria-label"] = $"{label}: before rollback {before}; after verification {after}",
+                ["aria-label"] =
+                    $"{label}: before restoration {before}; after verification {after}",
             },
             content: view =>
             {
@@ -726,6 +752,11 @@ public partial class IncidentCommanderApp
             }
         );
     }
+
+    private static string DeploymentLabel(string token) =>
+        string.IsNullOrEmpty(token)
+            ? "Not checked"
+            : $"checkout / gen {token[(token.LastIndexOf(':') + 1)..]}";
 
     private static void RenderMetric(IView view, string label, string value, bool degraded)
     {

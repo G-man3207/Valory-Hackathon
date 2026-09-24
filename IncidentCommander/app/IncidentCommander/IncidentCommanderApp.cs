@@ -36,7 +36,8 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
             }
         );
 
-    private readonly IncidentSimulation _simulation = new();
+    private readonly IncidentState _incident = new();
+    private readonly KubernetesLab _lab = new();
     private readonly Reactive<int> _revision = new(0);
     private readonly Reactive<bool> _busy = new(false);
     private readonly Reactive<string> _error = new("");
@@ -55,12 +56,43 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
     private readonly ApprovalSms? _sms = ApprovalSms.FromEnvironment();
     private readonly CancellationTokenSource _shutdown = new();
 
-    public Task Main()
+    public async Task Main()
     {
         app.OnStopping(async () => await DisposeAsync());
+        _busy.Value = true;
         RenderDashboard();
-        return Task.CompletedTask;
+        await _gate.WaitAsync(_shutdown.Token);
+        try
+        {
+            _incident.Reset(
+                await _lab.ReadMetricsAsync(_shutdown.Token),
+                await KubernetesLab.GetDeploymentIdAsync(_shutdown.Token)
+            );
+        }
+        catch (Exception ex) when (IsOperationalFailure(ex))
+        {
+            Log.Instance.Warning(ex, "Kubernetes preflight failed");
+            _incident.Escalate("Kubernetes lab unavailable; preflight could not complete.");
+            _error.Value = "Could not check the Kubernetes lab. Restore the lab and retry.";
+        }
+        finally
+        {
+            _busy.Value = false;
+            _revision.Value++;
+            _gate.Release();
+        }
     }
+
+    private static bool IsOperationalFailure(Exception ex) =>
+        ex
+            is EmergenceStoppedException
+                or OperationCanceledException
+                or InvalidOperationException
+                or ArgumentException
+                or JsonException
+                or HttpRequestException
+                or IOException
+                or System.ComponentModel.Win32Exception;
 
     private async Task InjectAsync()
     {
@@ -70,28 +102,26 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         }
         try
         {
-            if (_simulation.Phase != IncidentPhase.Healthy)
+            if (_incident.Phase != IncidentPhase.Healthy)
             {
                 return;
             }
             _busy.Value = true;
             _error.Value = "";
-            _simulation.Inject();
+            _agent.Value = "Lab";
+            await KubernetesLab.InjectAsync(_shutdown.Token);
+            _incident.Inject(
+                await _lab.ReadMetricsAsync(_shutdown.Token),
+                await KubernetesLab.GetDeploymentIdAsync(_shutdown.Token)
+            );
             _revision.Value++;
             await InvestigateAsync();
         }
-        catch (Exception ex)
-            when (ex
-                    is EmergenceStoppedException
-                        or OperationCanceledException
-                        or InvalidOperationException
-                        or ArgumentException
-                        or JsonException
-            )
+        catch (Exception ex) when (IsOperationalFailure(ex))
         {
             Log.Instance.Warning(ex, "Incident investigation failed");
             _error.Value = "Investigation could not finish. Reset the demo to try again.";
-            _simulation.Escalate("Investigation stopped; operator review required.");
+            _incident.Escalate("Investigation stopped; operator review required.");
         }
         finally
         {
@@ -110,7 +140,7 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
                 "Observability",
                 "Collect supported facts without diagnosing. On the first round inspect metrics, logs, "
                     + "deployments and dependency health using tools. Never invent readings.",
-                JsonSerializer.Serialize(_evidence),
+                EvidenceContext(),
                 true
             );
             if (
@@ -147,11 +177,10 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
             var critique = await RunRoleAsync<CriticResult>(
                 "Critic",
                 "Challenge the leading diagnosis using actual evidence. Look for correlation mistaken for "
-                    + "causality and missing connection ownership or dependency evidence. Do not manufacture "
+                    + "causality and missing service route or dependency evidence. Do not manufacture "
                     + "contradictory timestamps. MissingEvidence should list blockers to a reversible, human-approved "
                     + "mitigation, not every unanswered root-cause question. Exact code-level proof can remain "
-                    + "uncertain and be a follow-up in Assessment. Tools return fixed snapshots; source code and more "
-                    + "detailed transaction logs are unavailable. Empty MissingEvidence is allowed when sufficient "
+                    + "uncertain and be a follow-up in Assessment. Pod readiness alone does not prove checkout requests work.  Empty MissingEvidence is allowed when sufficient "
                     + "evidence exists for a reversible mitigation.",
                 EvidenceContext() + "\nHypotheses: " + JsonSerializer.Serialize(hypotheses)
             );
@@ -169,14 +198,13 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
             var decision = await RunRoleAsync<CommanderResult>(
                 "Commander",
                 "Choose NextStep: investigate, propose_rollback, or escalate. For investigate choose an unread "
-                    + "Tool from get_metrics, get_logs, get_recent_deployments, inspect_db_connections, "
-                    + "get_dependency_health. Tools return fixed snapshots: rereading get_logs cannot produce "
-                    + "detailed transaction logs, source code, or new evidence. Before proposing rollback you MUST "
-                    + "inspect_db_connections to distinguish owners and evaluate the Critic. After reading relevant "
-                    + "evidence, decide whether it supports a reversible rollback for human review; exact code-level "
-                    + "proof is not required, but conflicting evidence must be addressed. If it does not support "
-                    + "mitigation, escalate. A proposal is NOT execution. Never claim resolution. Use Tool empty for "
-                    + "other decisions.",
+                    + "Tool from get_metrics, get_logs, get_recent_deployments, inspect_service_routes, "
+                    + "get_dependency_health. Before proposing recovery you MUST inspect_service_routes. "
+                    + "The only available mitigation restores checkout INVENTORY_URL to http://inventory/inventory "
+                    + "in the isolated incident-lab Kubernetes namespace. Evaluate the Critic and actual DNS errors, "
+                    + "environment configuration, Services and endpoints. Exact code-level proof is not required, "
+                    + "but conflicting evidence must be addressed. If evidence does not support this mitigation, "
+                    + "escalate. A proposal is NOT execution. Never claim resolution. Use Tool empty for other decisions.",
                 $"Investigation round {round + 1} of 3.\n"
                     + EvidenceContext()
                     + "\nHypotheses: "
@@ -191,13 +219,13 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
             switch (decision.NextStep)
             {
                 case "investigate":
-                    ReadEvidence(decision.Tool);
+                    await ReadEvidenceAsync(decision.Tool);
                     break;
-                case "propose_rollback" when _evidence.ContainsKey("inspect_db_connections"):
-                    _simulation.ProposeRollback();
+                case "propose_rollback" when _evidence.ContainsKey("inspect_service_routes"):
+                    _incident.ProposeRollback();
                     _revision.Value++;
                     // The operator's Inject action starts this explicitly labelled SMS demo.
-                    if (_sms is not null && _simulation.PendingApproval is { } approval)
+                    if (_sms is not null && _incident.PendingApproval is { } approval)
                     {
                         try
                         {
@@ -214,13 +242,13 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
                             Record("SMS", "Delivery not confirmed; no automatic resend.");
                         }
                     }
-                    if (_simulation.PendingApproval is { } pending)
+                    if (_incident.PendingApproval is { } pending)
                         _ = PollApprovalAsync(pending);
                     return;
                 case "escalate":
                     _smsStatus.Value =
                         "No approval SMS sent: investigation escalated without a rollback proposal.";
-                    _simulation.Escalate(decision.Rationale);
+                    _incident.Escalate(decision.Rationale);
                     return;
                 default:
                     throw new InvalidOperationException("Unsupported or premature decision.");
@@ -228,7 +256,7 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         }
         _smsStatus.Value =
             "No approval SMS sent: investigation reached its three-round limit without a rollback proposal.";
-        _simulation.Escalate("Three-round investigation limit reached. Operator review required.");
+        _incident.Escalate("Three-round investigation limit reached. Operator review required.");
     }
 
     private async Task<T> RunRoleAsync<T>(
@@ -259,29 +287,29 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
                     pass.AddTool(
                         Tool.Of(
                             "get_metrics",
-                            "Read checkout and database metrics.",
-                            () => ReadEvidence("get_metrics")
+                            "Read live checkout HTTP probes and Kubernetes replica counts.",
+                            () => ReadEvidenceAsync("get_metrics")
                         )
                     );
                     pass.AddTool(
                         Tool.Of(
                             "get_logs",
                             "Read recent checkout logs.",
-                            () => ReadEvidence("get_logs")
+                            () => ReadEvidenceAsync("get_logs")
                         )
                     );
                     pass.AddTool(
                         Tool.Of(
                             "get_recent_deployments",
-                            "Read deployment history.",
-                            () => ReadEvidence("get_recent_deployments")
+                            "Read current Kubernetes deployment metadata and configuration.",
+                            () => ReadEvidenceAsync("get_recent_deployments")
                         )
                     );
                     pass.AddTool(
                         Tool.Of(
                             "get_dependency_health",
                             "Read dependency health.",
-                            () => ReadEvidence("get_dependency_health")
+                            () => ReadEvidenceAsync("get_dependency_health")
                         )
                     );
                 }
@@ -292,23 +320,28 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         return result;
     }
 
-    private string ReadEvidence(string name)
+    private async Task<string> ReadEvidenceAsync(string name)
+    {
+        var result = await _lab.ReadToolAsync(name, _shutdown.Token);
+        lock (_evidence)
+        {
+            _evidence[name] = result;
+        }
+        Record("Tool", $"Inspected {name}.");
+        return result;
+    }
+
+    private string EvidenceContext()
     {
         lock (_evidence)
         {
-            var result = _simulation.ReadTool(name);
-            _evidence[name] = result;
-            Record("Tool", $"Inspected {name}.");
-            return result;
+            return JsonSerializer.Serialize(_evidence) + "\nObservations: " + _observations.Value;
         }
     }
 
-    private string EvidenceContext() =>
-        JsonSerializer.Serialize(_evidence) + "\nObservations: " + _observations.Value;
-
     private void Record(string actor, string message)
     {
-        _simulation.Record(actor, message);
+        _incident.Record(actor, message);
         _revision.Value++;
     }
 
@@ -321,12 +354,24 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         await _gate.WaitAsync(_shutdown.Token);
         try
         {
-            _simulation.Decide(code, approve);
+            _incident.Decide(code, approve);
             _error.Value = "";
             if (approve)
             {
                 _busy.Value = true;
-                await RecoverAsync();
+                try
+                {
+                    await RecoverAsync();
+                }
+                catch (Exception ex) when (IsOperationalFailure(ex))
+                {
+                    Log.Instance.Warning(ex, "Kubernetes recovery failed");
+                    _incident.Escalate(
+                        "Kubernetes restoration or live verification failed; operator review required."
+                    );
+                    _error.Value =
+                        "Recovery could not be verified. Inspect the Kubernetes lab before retrying.";
+                }
             }
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
@@ -350,7 +395,7 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
             while (!_shutdown.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(3), _shutdown.Token);
-                if (_simulation.PendingApproval != approval)
+                if (_incident.PendingApproval != approval)
                     return;
                 if (DateTimeOffset.UtcNow >= approval.ExpiresAt)
                 {
@@ -360,7 +405,7 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
                 if (_sms is null)
                     continue;
                 var decision = await _sms.GetDecisionAsync(approval, _shutdown.Token);
-                if (_simulation.PendingApproval != approval)
+                if (_incident.PendingApproval != approval)
                     return;
                 if (decision is { } approved)
                 {
@@ -372,7 +417,7 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         catch (Exception ex)
             when (ex is HttpRequestException or OperationCanceledException or JsonException)
         {
-            if (_simulation.PendingApproval != approval)
+            if (_incident.PendingApproval != approval)
                 return;
             _smsStatus.Value =
                 "SMS replies could not be checked. Local demo approval remains available.";
@@ -382,27 +427,34 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
     private async Task RecoverAsync()
     {
         _agent.Value = "Commander";
-        var rejectedDeployment = _simulation.DeploymentId;
-        _simulation.Rollback();
+        var rejectedDeployment = _incident.DeploymentId;
+        _incident.BeginRecovery();
         _revision.Value++;
-        _simulation.VerifyRecovery();
+        await KubernetesLab.RecoverAsync(rejectedDeployment, _shutdown.Token);
+        _incident.RollbackCompleted(
+            await _lab.ReadMetricsAsync(_shutdown.Token),
+            await KubernetesLab.GetDeploymentIdAsync(_shutdown.Token)
+        );
+        _incident.VerifyRecovery();
+        if (_incident.Phase != IncidentPhase.Resolved)
+            return;
         _revision.Value++;
         _report.Value =
-            $"# Incident {_simulation.Id}\n\n"
-            + $"Simulated checkout incident. Human-approved rollback of {rejectedDeployment}.\n\n"
-            + $"Recovery verified against error rate, latency and connection thresholds.\n\n{_decision.Value}";
+            $"# Incident {_incident.Id}\n\n"
+            + $"Real isolated Kubernetes checkout incident. Human-approved route restoration for {rejectedDeployment}.\n\n"
+            + $"Recovery verified with ten successful checkout HTTP probes and all requested pods ready.\n\n{_decision.Value}";
         try
         {
             var report = await RunRoleAsync<IncidentReport>(
                 "Commander",
                 "Write a short Markdown incident report: impact, likely cause, evidence, human-approved "
-                    + "mitigation, recovery and follow-up. Infrastructure is simulated. Do not overstate certainty or "
+                    + "mitigation, recovery and follow-up. Infrastructure is a real isolated kind Kubernetes cluster, not production. Do not overstate certainty or "
                     + "invent duration. Timeline and current metrics are authoritative.",
                 EvidenceContext()
                     + "\nTimeline: "
-                    + JsonSerializer.Serialize(_simulation.Events)
+                    + JsonSerializer.Serialize(_incident.Events)
                     + "\nCurrent metrics: "
-                    + _simulation.ReadTool("get_metrics")
+                    + JsonSerializer.Serialize(_incident.Metrics)
             );
             if (!string.IsNullOrWhiteSpace(report.Markdown))
                 _report.Value = report.Markdown;
@@ -418,6 +470,7 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         await _shutdown.CancelAsync();
         await _gate.WaitAsync();
         _sms?.Dispose();
+        _lab.Dispose();
         _shutdown.Dispose();
         _gate.Dispose();
     }
@@ -430,7 +483,13 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         }
         try
         {
-            _simulation.Reset();
+            _busy.Value = true;
+            _agent.Value = "Lab";
+            await KubernetesLab.ResetAsync(_shutdown.Token);
+            _incident.Reset(
+                await _lab.ReadMetricsAsync(_shutdown.Token),
+                await KubernetesLab.GetDeploymentIdAsync(_shutdown.Token)
+            );
             _evidence.Clear();
             _observations.Value =
                 _hypotheses.Value =
@@ -444,8 +503,17 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
             _agent.Value = "Idle";
             _revision.Value++;
         }
+        catch (Exception ex) when (IsOperationalFailure(ex))
+        {
+            Log.Instance.Warning(ex, "Kubernetes reset failed");
+            _incident.Escalate("Lab reset failed; operator review required.");
+            _error.Value = "Could not restore and verify the Kubernetes lab.";
+        }
         finally
         {
+            _busy.Value = false;
+            _agent.Value = "Idle";
+            _revision.Value++;
             _gate.Release();
         }
     }

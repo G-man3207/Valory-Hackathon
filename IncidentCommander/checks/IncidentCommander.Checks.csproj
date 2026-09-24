@@ -8,7 +8,8 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../app/IncidentCommander/IncidentSimulation.cs" Link="IncidentSimulation.cs" />
+    <Compile Include="../app/IncidentCommander/IncidentState.cs" Link="IncidentState.cs" />
+    <Compile Include="../app/IncidentCommander/KubernetesLab.cs" Link="KubernetesLab.cs" />
     <Compile Include="../app/IncidentCommander/ApprovalSms.cs" Link="ApprovalSms.cs" />
   </ItemGroup>
 </Project>

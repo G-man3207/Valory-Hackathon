@@ -1,103 +1,133 @@
-using System.Text.Json;
-
 var clock = new CheckClock();
-var simulation = new IncidentSimulation(clock);
-Reject(() => simulation.Rollback());
-simulation.Inject();
-var firstId = simulation.Id;
-Reject(() => simulation.Rollback());
-Reject(() => simulation.VerifyRecovery());
-Reject(() => simulation.ReadTool("rollback_deployment"));
+var state = new IncidentState(clock);
+var healthy = new LabMetrics(0, 27, 2, 2);
+var fault = new LabMetrics(0.8, 173, 2, 2);
+Check(
+    state.Metrics is null && state.Phase != IncidentPhase.Healthy,
+    "Unknown metrics cannot imply healthy infrastructure."
+);
+Reject(state.BeginRecovery);
+Reject(() => state.Reset(healthy with { ErrorRate = double.NaN }, "uid:1"));
+Reject(() => state.Reset(healthy, ""));
+state.Reset(fault, "uid:1");
+Check(
+    state.Phase == IncidentPhase.Escalated && state.Metrics == fault,
+    "Failed preflight must retain actual failures."
+);
+state.Reset(healthy, "uid:1");
+state.Inject(fault, "uid:2");
+var firstId = state.Id;
+Reject(() => state.Inject(fault, "uid:3"));
+Reject(state.BeginRecovery);
+Reject(state.VerifyRecovery);
+state.ProposeRollback();
+var code = state.PendingApproval!.Code;
+Check(
+    state.PendingApproval.DeploymentId == "uid:2",
+    "Approval must bind the observed deployment UID and generation."
+);
+Reject(() => state.Decide("wrong-code", true));
+Check(state.Phase == IncidentPhase.WaitingForApproval, "Bad codes cannot approve actions.");
+state.Decide(code, false);
+Reject(state.BeginRecovery);
+Reject(() => state.Decide(code, true));
+Check(
+    state.BeforeRecovery is null && state.Metrics == fault,
+    "Denial must preserve real failures without a recovery comparison."
+);
+
+state.Reset(healthy, "uid:3");
+state.Inject(fault, "uid:4");
+Check(state.Id != firstId, "Each incident needs a new identity.");
+state.ProposeRollback();
+code = state.PendingApproval!.Code;
+state.Reset(healthy, "uid:5");
+Reject(() => state.Decide(code, true));
+state.Inject(fault, "uid:6");
+state.ProposeRollback();
+Reject(() => state.Decide(code, true));
+clock.Now = state.PendingApproval!.ExpiresAt;
+Reject(() => state.Decide(state.PendingApproval!.Code, true));
+Check(
+    state.Phase == IncidentPhase.Escalated && state.PendingApproval is null,
+    "Expiry must invalidate approval."
+);
+Reject(state.BeginRecovery);
+
 foreach (
-    var name in new[]
+    var recovered in new[]
     {
-        "get_metrics",
-        "get_logs",
-        "get_recent_deployments",
-        "inspect_db_connections",
-        "get_dependency_health",
+        healthy,
+        fault,
+        healthy with
+        {
+            ReadyReplicas = 1,
+        },
+        healthy with
+        {
+            DesiredReplicas = 0,
+            ReadyReplicas = 0,
+        },
     }
 )
 {
-    using var json = JsonDocument.Parse(simulation.ReadTool(name));
+    state.Reset(healthy, "uid:7");
+    state.Inject(fault, "uid:8");
+    state.ProposeRollback();
+    code = state.PendingApproval!.Code;
+    state.Decide(code, true);
+    Reject(() => state.Decide(code, true));
+    Reject(() => state.RollbackCompleted(recovered, "uid:9"));
+    state.BeginRecovery();
     Check(
-        json.RootElement.GetProperty("evidence_id").GetString() is not null,
-        "Every tool must cite evidence."
+        state.BeforeRecovery == fault && state.Metrics == fault,
+        "Beginning recovery must capture, never modify, real measurements."
+    );
+    Reject(state.BeginRecovery);
+    state.RollbackCompleted(recovered, "uid:9");
+    Reject(() => state.RollbackCompleted(recovered, "uid:10"));
+    state.VerifyRecovery();
+    Check(
+        state.Metrics == recovered && state.DeploymentId == "uid:9",
+        "Completion must retain the observed deployment and measurements."
+    );
+    Check(
+        state.Phase == (recovered == healthy ? IncidentPhase.Resolved : IncidentPhase.Escalated),
+        "Resolution requires all probes and requested replicas to succeed."
     );
 }
-Check(simulation.Events.Count == 1, "Investigation tools must be read-only.");
-simulation.ProposeRollback();
-var code = simulation.PendingApproval!.Code;
-Reject(() => simulation.Decide("wrong-code", true));
-Check(simulation.Phase == IncidentPhase.WaitingForApproval, "Bad code must not approve an action.");
-simulation.Decide(code, false);
-Check(simulation.BeforeRecovery is null, "Denied actions must not create recovery comparisons.");
-Reject(() => simulation.Rollback());
-Reject(() => simulation.Decide(code, true));
-Check(simulation.ErrorRate > 0.01, "Denial must not fix the incident.");
 
-simulation.Inject();
-Check(simulation.Id != firstId, "Each incident needs a new identity.");
-simulation.ProposeRollback();
-code = simulation.PendingApproval!.Code;
-simulation.Reset();
-Reject(() => simulation.Decide(code, true));
-simulation.Inject();
-simulation.ProposeRollback();
-Reject(() => simulation.Decide(code, true));
-clock.Now = simulation.PendingApproval!.ExpiresAt;
-Reject(() => simulation.Decide(simulation.PendingApproval!.Code, true));
 Check(
-    simulation.Phase == IncidentPhase.Escalated && simulation.PendingApproval is null,
-    "Expiry must invalidate approval."
-);
-Reject(() => simulation.Rollback());
-
-simulation.Inject();
-simulation.ProposeRollback();
-code = simulation.PendingApproval!.Code;
-simulation.Decide(code, true);
-Reject(() => simulation.Decide(code, true));
-var beforeRollback = (simulation.ErrorRate, simulation.LatencyMs, simulation.ConnectionUsage);
-simulation.Rollback();
-Check(
-    simulation.BeforeRecovery == beforeRollback,
-    "Recovery must retain the actual pre-rollback measurements."
-);
-Reject(() => simulation.Rollback());
-simulation.VerifyRecovery();
-Check(
-    simulation.Phase == IncidentPhase.Resolved && simulation.ErrorRate < 0.01,
-    "Approved rollback must recover."
-);
-Check(
-    simulation.Events.Zip(simulation.Events.Skip(1)).All(pair => pair.First.At <= pair.Second.At),
+    state.Events.Zip(state.Events.Skip(1)).All(pair => pair.First.At <= pair.Second.At),
     "Timeline must be ordered."
 );
-var snapshot = simulation.Events;
+var snapshot = state.Events;
 var snapshotCount = snapshot.Count;
 Parallel.For(
     0,
     100,
     _ =>
     {
-        simulation.Record("Check", "Concurrent event.");
-        foreach (var entry in simulation.Events)
+        state.Record("Check", "Concurrent event.");
+        foreach (var entry in state.Events)
             Check(entry is not null, "Snapshots must contain complete events.");
     }
 );
-Check(simulation.Events.Count == snapshotCount + 100, "Concurrent writes must not lose events.");
-simulation.Reset();
+Check(state.Events.Count == snapshotCount + 100, "Concurrent writes must not lose events.");
+state.Reset(healthy, "uid:11");
 Check(
-    simulation.BeforeRecovery is null,
-    "Reset must clear the previous incident's recovery comparison."
+    state.BeforeRecovery is null && state.PendingApproval is null && state.Id == "",
+    "Reset must clear prior incident state."
 );
 Check(
-    snapshot.Count == snapshotCount && simulation.Events.Count == 0,
-    "Rendering snapshots must survive writes and reset."
+    snapshot.Count == snapshotCount
+        && state.Events.Count == 1
+        && state.Events[0].Actor == "Preflight",
+    "Reset retains only new live preflight; previous snapshots remain stable."
 );
-Console.WriteLine("Incident simulation checks passed.");
+Console.WriteLine("Real incident state checks passed.");
 SmsChecks.Run();
+KubernetesLabChecks.Run();
 
 static void Check(bool condition, string message)
 {

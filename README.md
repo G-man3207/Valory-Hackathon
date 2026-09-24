@@ -1,6 +1,6 @@
 # AI Incident Commander
 
-A hackathon demo built with Ikon: four AI roles investigate simulated checkout telemetry, challenge a diagnosis, request human approval, roll back a simulated deployment, and verify recovery. No real infrastructure is modified.
+A hackathon demo built with Ikon: four AI roles investigate a real checkout failure in an isolated local Kubernetes lab, challenge a diagnosis, request human approval, restore the inventory URL, and verify recovery. Actions affect only the local incident-lab namespace; no production systems are connected.
 
 ## Development
 
@@ -24,12 +24,12 @@ dotnet csharpier format IncidentCommander/app/IncidentCommander/*.cs IncidentCom
 
 ## Demo
 
-1. Inject an incident. The Observability role chooses read-only tools; Hypothesis ranks explanations; Critic challenges them; Commander chooses more evidence or proposes rollback.
-2. Review the evidence. The Commander cannot execute rollback: the domain requires a current, unexpired, single-use approval tied to the incident and deployment.
-3. Reply to the SMS exactly as instructed, or enter the pending code in the explicitly labelled local demo fallback.
-4. Inspect verified recovery and copy or download the report. Reset invalidates outstanding approvals.
+1. Inject the Kubernetes fault. Checkout receives a bad inventory DNS name and returns HTTP 503 while its pod stays Ready. Observability reads live evidence; Hypothesis ranks explanations; Critic challenges them; Commander requests more evidence or proposes restoring the known inventory URL.
+2. Review the evidence. The Commander cannot execute restoration: the domain requires a current, unexpired, single-use approval tied to the incident and actual deployment identity.
+3. Reply to the SMS exactly as instructed, or enter the pending code in the explicitly labelled local lab fallback.
+4. Inspect verified recovery and copy or download the report. Reset restores the lab inventory URL and invalidates outstanding approvals.
 
-Model runs have timeouts and a three-round investigation limit. Failure escalates to an operator; it never invents a successful diagnosis. Denial or expired approval leaves the service degraded. The simulation and incident state are in memory and reset when the app restarts.
+Model runs have timeouts and a three-round investigation limit. Failure escalates to an operator; it never invents a successful diagnosis. Denial or expired approval leaves the service degraded. Incident workflow state is in memory and resets when the app restarts; Kubernetes workload state persists. Recover the lab after an interrupted run before starting another incident.
 
 ## SMS configuration
 
@@ -43,14 +43,14 @@ node dev.mjs --config-file /home/dev/.config/incident-commander/server.json
 
 The outside-repository server config points to the Tailscale-issued certificate and key. Tailscale Serve proxies HTTPS 443 to local frontend 9443; the SDK connects to backend 8444 with that same valid certificate. This uses no public Ikon relay or Tailscale Funnel. Renew the certificate and restart before its expiry.
 
-With SMS configured, the **Inject incident & request SMS** action can send one real approval request. Replies are polled through 46elks' authenticated API, so the private Tailscale demo does not need a public webhook. The parser checks direction, sender, recipient, timestamp, and exact command/code. Missing SMS configuration leaves the local demo approval available.
+With SMS configured, the **Inject Kubernetes fault & request SMS** action can send one real approval request. Replies are polled through 46elks' authenticated API, so the private Tailscale demo does not need a public webhook. The parser checks direction, sender, recipient, timestamp, and exact command/code. Missing SMS configuration leaves the local lab approval available.
 
 ## Current scope
 
-One database-connection leak fixture, five investigative tools, one guarded rollback, four real AI roles, a responsive native Ikon dashboard, and an incident report. One incident per session; no production integrations or durable incident history. Tailscale controls access to the development preview; the local approval fallback is for the simulation, not production authorization.
+One real checkout-to-inventory failure, guarded restoration, four AI roles, a responsive native Ikon dashboard, and an incident report. Probe errors, probe P95 and Ready-pod counts come from the live lab. Unknown readings display Not checked. One incident per session; no production integrations or durable incident history. Tailscale controls access to the development preview. Local approval authorizes a real change restricted to the lab namespace.
 
 ## Real Kubernetes lab
 
-The separate [seed lab](lab/README.md) runs checkout and inventory on a real local Kubernetes cluster. `./lab/lab.sh check` verifies healthy HTTP 200, an injected deployment causing a real dependency DNS failure and HTTP 503, then recovery to HTTP 200. `break`, `evidence`, and `recover` support manual investigation. The Ikon dashboard still uses its original in-memory simulation; it does not yet read or change this cluster.
+The [Kubernetes lab](lab/README.md) runs checkout and inventory on a real local kind cluster and supplies the dashboard's only incident scenario. `./lab/lab.sh check` verifies healthy HTTP 200, an injected deployment causing a real dependency DNS failure and HTTP 503, then recovery to HTTP 200. `break`, `evidence`, and `recover` support manual investigation. The Ikon dashboard reads this cluster and uses the same restricted fault and recovery operations. Seed the lab before running the app.
 
 Local verification additionally requires ShellCheck and Python 3 for shell checks and Python syntax validation. The cluster integration check runs explicitly on the devbox.

@@ -6,16 +6,18 @@
 web
 
 ## Users
-Hackathon presenters and observers investigating a simulated infrastructure incident.
+Hackathon presenters and observers investigating a real incident in an isolated local Kubernetes lab.
 
 ## Product Purpose
-Demonstrate four AI roles investigating a database connection leak, challenging a diagnosis, requesting human approval, and verifying simulated recovery.
+Demonstrate four AI roles investigating a checkout dependency failure, challenging a diagnosis, requesting human approval, restoring the inventory URL, and verifying recovery with live HTTP probes.
 
 ## Capabilities and Constraints
-Three-hour build. IkonAI is required. Native C# reactive UI. One incident flow, reset, metrics, timeline, approval and incident report. Infrastructure actions are simulated. Optional SMS approval uses 46elks when configured. Local demo approval remains available and is labeled explicitly.
+IkonAI is required. Native C# reactive UI. One real scenario runs in the local kind cluster's incident-lab namespace: checkout receives a bad inventory DNS name and returns HTTP 503 even while its pod remains Ready. The agents read actual Kubernetes configuration, logs and probe results. Approved remediation restores the known inventory URL on the guarded checkout deployment. No production systems are connected.
+
+The dashboard provides fault injection, reset, live metrics, a timeline, human approval and an incident report. Optional SMS approval uses 46elks when configured. Local lab approval remains available and is labeled explicitly. Reset restores the lab and invalidates pending approval. Unchecked metrics display Not checked.
 
 ## Evidence on Hand
-The root ai-incident-commander-hackathon-plan.md provides the product brief. Metrics must come from the simulation and role output from the AI workflow. Confidence is an estimate, never a measured probability.
+The lab workloads and adapter provide the runtime evidence. The root hackathon plan is historical design context; its earlier simulated database scenario is no longer an active scenario. Confidence is an AI estimate, never a measured probability.
 
 ## Brand Commitments
-One dark operations dashboard, focused on status, agents, hypotheses, timeline and approval.
+One dark operations dashboard, focused on the scenario, status, agents, hypotheses, timeline and approval.

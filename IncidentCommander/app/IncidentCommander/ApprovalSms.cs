@@ -62,7 +62,7 @@ public sealed class ApprovalSms : IDisposable
                 ["from"] = _from,
                 ["to"] = _oncall,
                 ["message"] =
-                    $"Incident Commander DEMO: rollback deployment {approval.DeploymentId}. "
+                    "K8s DEMO: restore checkout inventory route in namespace incident-lab. "
                     + $"Reply APPROVE {approval.Code} or DENY {approval.Code} within 5 minutes.",
             }
         );
