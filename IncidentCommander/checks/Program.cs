@@ -1,3 +1,6 @@
+if (args.Length != 0 && !(args.Length == 1 && args[0] == "--live-kubernetes"))
+    throw new ArgumentException("Only --live-kubernetes is supported; omit it for offline checks.");
+
 var clock = new CheckClock();
 var state = new IncidentState(clock);
 var healthy = new LabMetrics(0, 27, 2, 2);
@@ -128,6 +131,8 @@ Check(
 Console.WriteLine("Real incident state checks passed.");
 SmsChecks.Run();
 KubernetesLabChecks.Run();
+if (args.Length == 1)
+    await KubernetesLabChecks.RunLiveAsync();
 
 static void Check(bool condition, string message)
 {

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -13,7 +14,14 @@ public sealed record LabMetrics(
 public sealed class KubernetesLab : IDisposable
 {
     private const string GoodUrl = "http://inventory/inventory";
-    private const string BadUrl = "http://missing-service/inventory";
+
+    // ponytail: bounded configuration chaos; add other fault types only with equally guarded recovery.
+    internal static IReadOnlyList<string> FaultUrls { get; } =
+        Array.AsReadOnly<string>([
+            "http://missing-service/inventory",
+            "http://inventory:81/inventory",
+            "http://inventory/missing",
+        ]);
     private static readonly string[] KubectlScope =
     [
         "--kubeconfig",
@@ -73,7 +81,8 @@ public sealed class KubernetesLab : IDisposable
     public static async Task InjectAsync(CancellationToken token)
     {
         using var deployment = await DeploymentAsync(token).ConfigureAwait(false);
-        await PatchAsync(deployment.RootElement, GoodUrl, BadUrl, token).ConfigureAwait(false);
+        var fault = FaultUrls[RandomNumberGenerator.GetInt32(FaultUrls.Count)];
+        await PatchAsync(deployment.RootElement, GoodUrl, fault, token).ConfigureAwait(false);
     }
 
     public static async Task RecoverAsync(string expectedDeploymentId, CancellationToken token)
@@ -84,7 +93,13 @@ public sealed class KubernetesLab : IDisposable
             throw new InvalidOperationException(
                 "Deployment changed after approval was requested; recovery rejected."
             );
-        await PatchAsync(deployment.RootElement, BadUrl, GoodUrl, token).ConfigureAwait(false);
+        await PatchAsync(
+                deployment.RootElement,
+                DependencyValue(deployment.RootElement),
+                GoodUrl,
+                token
+            )
+            .ConfigureAwait(false);
     }
 
     public static async Task ResetAsync(CancellationToken token)
@@ -93,7 +108,7 @@ public sealed class KubernetesLab : IDisposable
         var root = deployment.RootElement;
         if (DependencyValue(root) == GoodUrl)
             return;
-        await PatchAsync(root, BadUrl, GoodUrl, token).ConfigureAwait(false);
+        await PatchAsync(root, DependencyValue(root), GoodUrl, token).ConfigureAwait(false);
     }
 
     public async Task<string> ReadToolAsync(string name, CancellationToken token)
@@ -106,6 +121,7 @@ public sealed class KubernetesLab : IDisposable
                     token,
                     "logs",
                     "deployment/checkout",
+                    "--all-pods=true",
                     "--tail=40",
                     "--limit-bytes=16000",
                     "--timestamps=true"
@@ -164,6 +180,7 @@ public sealed class KubernetesLab : IDisposable
                         token,
                         "logs",
                         "deployment/inventory",
+                        "--all-pods=true",
                         "--tail=20",
                         "--limit-bytes=8000",
                         "--timestamps=true"
@@ -208,7 +225,13 @@ public sealed class KubernetesLab : IDisposable
 
     internal static string BuildPatch(JsonElement deployment, string oldUrl, string newUrl)
     {
-        if (DependencyValue(deployment) != oldUrl)
+        if (
+            DependencyValue(deployment) != oldUrl
+            || !(
+                oldUrl == GoodUrl && FaultUrls.Contains(newUrl)
+                || newUrl == GoodUrl && FaultUrls.Contains(oldUrl)
+            )
+        )
             throw new InvalidOperationException(
                 "Lab configuration differs from the known scenario; mutation rejected."
             );
@@ -278,6 +301,35 @@ public sealed class KubernetesLab : IDisposable
             .ConfigureAwait(false);
         await KubectlAsync(token, "rollout", "status", "deployment/checkout", "--timeout=90s")
             .ConfigureAwait(false);
+        // Ready can precede service routing convergence; observe traffic before taking the incident sample.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
+        var expected =
+            newUrl == GoodUrl
+                ? System.Net.HttpStatusCode.OK
+                : System.Net.HttpStatusCode.ServiceUnavailable;
+        for (var consecutive = 0; consecutive < 3; )
+        {
+            try
+            {
+                using var response = await http.GetAsync(
+                        "http://127.0.0.1:19080/checkout",
+                        timeout.Token
+                    )
+                    .ConfigureAwait(false);
+                consecutive = response.StatusCode == expected ? consecutive + 1 : 0;
+            }
+            catch (Exception ex)
+                when (ex is HttpRequestException or TaskCanceledException
+                    && !timeout.IsCancellationRequested
+                )
+            {
+                consecutive = 0;
+            }
+            if (consecutive < 3)
+                await Task.Delay(TimeSpan.FromSeconds(1), timeout.Token).ConfigureAwait(false);
+        }
     }
 
     private static async Task<JsonDocument> DeploymentAsync(CancellationToken token) =>

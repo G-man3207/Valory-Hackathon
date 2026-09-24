@@ -6,6 +6,7 @@ readonly kubeconfig=/home/dev/.config/incident-commander/lab.kubeconfig
 readonly context=kind-incident-lab
 readonly namespace=incident-lab
 readonly base_url=http://127.0.0.1:19080
+readonly faults=(http://missing-service/inventory http://inventory:81/inventory http://inventory/missing)
 kube=(kubectl --kubeconfig "$kubeconfig" --context "$context" --namespace "$namespace" --request-timeout=10s)
 
 rollout() {
@@ -46,7 +47,8 @@ case "${1:-status}" in
     assert_status 200
     ;;
   break)
-    set_dependency http://missing-service/inventory
+    # Random choice is bounded to known recoverable dependency configurations.
+    set_dependency "${faults[RANDOM % ${#faults[@]}]}"
     assert_status 503
     ;;
   recover)
@@ -66,11 +68,15 @@ case "${1:-status}" in
   check)
     set_dependency http://inventory/inventory
     assert_status 200
-    set_dependency http://missing-service/inventory
-    assert_status 503
-    set_dependency http://inventory/inventory
-    assert_status 200
-    echo 'Real dependency failure and recovery check passed.'
+    trap 'set_dependency http://inventory/inventory' EXIT
+    for fault in "${faults[@]}"; do
+      set_dependency "$fault"
+      assert_status 503
+      set_dependency http://inventory/inventory
+      assert_status 200
+    done
+    trap - EXIT
+    echo 'All three real dependency failures and recoveries passed.'
     ;;
   *)
     echo "Usage: $0 {seed|break|recover|status|evidence|check}" >&2

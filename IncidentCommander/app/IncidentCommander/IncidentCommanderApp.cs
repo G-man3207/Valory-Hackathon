@@ -201,7 +201,7 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
                     + "Tool from get_metrics, get_logs, get_recent_deployments, inspect_service_routes, "
                     + "get_dependency_health. Before proposing recovery you MUST inspect_service_routes. "
                     + "The only available mitigation restores checkout INVENTORY_URL to http://inventory/inventory "
-                    + "in the isolated incident-lab Kubernetes namespace. Evaluate the Critic and actual DNS errors, "
+                    + "in the isolated incident-lab Kubernetes namespace. Evaluate the Critic and actual dependency errors (DNS, connection or HTTP), "
                     + "environment configuration, Services and endpoints. Exact code-level proof is not required, "
                     + "but conflicting evidence must be addressed. If evidence does not support this mitigation, "
                     + "escalate. A proposal is NOT execution. Never claim resolution. Use Tool empty for other decisions.",

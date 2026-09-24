@@ -14,7 +14,7 @@ cd IncidentCommander
 ikon app run --no-auto-frontend-login
 ```
 
-`verify.sh` runs locally and requires zero ESLint warnings, strict TypeScript, a frontend build, a C# build with warnings as errors, CSharpier formatting, and executable domain/SMS checks. The generated SDK frontend currently emits a bundle-size advisory. The backend build needs the authenticated Ikon package feed.
+`verify.sh` runs locally and requires zero ESLint warnings, strict TypeScript, a frontend build, a C# build with warnings as errors, CSharpier formatting, and executable domain/SMS/Kubernetes guard checks. The generated SDK frontend currently emits a bundle-size advisory. The backend build needs the authenticated Ikon package feed.
 
 Format C# with the repository's pinned formatter:
 
@@ -24,7 +24,7 @@ dotnet csharpier format IncidentCommander/app/IncidentCommander/*.cs IncidentCom
 
 ## Demo
 
-1. Inject the Kubernetes fault. Checkout receives a bad inventory DNS name and returns HTTP 503 while its pod stays Ready. Observability reads live evidence; Hypothesis ranks explanations; Critic challenges them; Commander requests more evidence or proposes restoring the known inventory URL.
+1. Inject a random Kubernetes fault. One of three inventory URL changes causes a real DNS failure, refused connection, or HTTP 404. Checkout returns HTTP 503 while its pod can stay Ready; the agents must identify the selected failure from live evidence. Observability reads live evidence; Hypothesis ranks explanations; Critic challenges them; Commander requests more evidence or proposes restoring the known inventory URL.
 2. Review the evidence. The Commander cannot execute restoration: the domain requires a current, unexpired, single-use approval tied to the incident and actual deployment identity.
 3. Reply to the SMS exactly as instructed, or enter the pending code in the explicitly labelled local lab fallback.
 4. Inspect verified recovery and copy or download the report. Reset restores the lab inventory URL and invalidates outstanding approvals.
@@ -43,14 +43,20 @@ node dev.mjs --config-file /home/dev/.config/incident-commander/server.json
 
 The outside-repository server config points to the Tailscale-issued certificate and key. Tailscale Serve proxies HTTPS 443 to local frontend 9443; the SDK connects to backend 8444 with that same valid certificate. This uses no public Ikon relay or Tailscale Funnel. Renew the certificate and restart before its expiry.
 
-With SMS configured, the **Inject Kubernetes fault & request SMS** action can send one real approval request. Replies are polled through 46elks' authenticated API, so the private Tailscale demo does not need a public webhook. The parser checks direction, sender, recipient, timestamp, and exact command/code. Missing SMS configuration leaves the local lab approval available.
+With SMS configured, the **Inject random Kubernetes fault & request SMS** action can send one real approval request. Replies are polled through 46elks' authenticated API, so the private Tailscale demo does not need a public webhook. The parser checks direction, sender, recipient, timestamp, and exact command/code. Missing SMS configuration leaves the local lab approval available.
 
 ## Current scope
 
-One real checkout-to-inventory failure, guarded restoration, four AI roles, a responsive native Ikon dashboard, and an incident report. Probe errors, probe P95 and Ready-pod counts come from the live lab. Unknown readings display Not checked. One incident per session; no production integrations or durable incident history. Tailscale controls access to the development preview. Local approval authorizes a real change restricted to the lab namespace.
+Three randomly selected real dependency faults in one checkout-to-inventory lab, guarded restoration, four AI roles, a responsive native Ikon dashboard, and an incident report. Probe errors, probe P95 and Ready-pod counts come from the live lab. Unknown readings display Not checked. One incident per session; no production integrations or durable incident history. Tailscale controls access to the development preview. Local approval authorizes a real change restricted to the lab namespace.
 
 ## Real Kubernetes lab
 
-The [Kubernetes lab](lab/README.md) runs checkout and inventory on a real local kind cluster and supplies the dashboard's only incident scenario. `./lab/lab.sh check` verifies healthy HTTP 200, an injected deployment causing a real dependency DNS failure and HTTP 503, then recovery to HTTP 200. `break`, `evidence`, and `recover` support manual investigation. The Ikon dashboard reads this cluster and uses the same restricted fault and recovery operations. Seed the lab before running the app.
+The [Kubernetes lab](lab/README.md) runs checkout and inventory on a real local kind cluster and supplies the dashboard's only incident scenario. `./lab/lab.sh check` verifies healthy HTTP 200, injected dependency failures producing HTTP 503, then recovery to HTTP 200. `break`, `evidence`, and `recover` support manual investigation. The Ikon dashboard reads this cluster and uses the same restricted fault and recovery operations. Seed the lab before running the app. The supported faults are limited to the checkout inventory URL; no node or pod disruption or chaos-framework dependency is introduced.
 
 Local verification additionally requires ShellCheck and Python 3 for shell checks and Python syntax validation. The cluster integration check runs explicitly on the devbox.
+
+Run the adapter's random injection and guarded recovery check explicitly (changes the isolated lab and restores it afterward; sends no SMS):
+
+```sh
+dotnet run --project IncidentCommander/checks/IncidentCommander.Checks.csproj --configuration Release -- --live-kubernetes
+```

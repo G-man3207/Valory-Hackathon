@@ -60,10 +60,13 @@ public partial class IncidentCommanderApp
                                                 if (phase == IncidentPhase.Healthy)
                                                 {
                                                     view.Button(
-                                                        [Button.PrimaryMd, "min-h-11"],
+                                                        [
+                                                            Button.PrimaryMd,
+                                                            "min-h-11 max-w-full whitespace-normal text-left",
+                                                        ],
                                                         text: _sms is not null
-                                                            ? "Inject Kubernetes fault & request SMS"
-                                                            : "Inject Kubernetes fault",
+                                                            ? "Inject random Kubernetes fault & request SMS"
+                                                            : "Inject random Kubernetes fault",
                                                         disabled: busy,
                                                         onClick: InjectAsync
                                                     );
@@ -89,13 +92,13 @@ public partial class IncidentCommanderApp
                                     {
                                         view.Heading(
                                             ["text-base font-semibold"],
-                                            text: "Scenario: Ready pods, failing checkouts"
+                                            text: "Scenario: random dependency failure"
                                         );
                                         view.Text(
                                             ["text-sm text-zinc-300 leading-relaxed max-w-prose"],
                                             text: "In the local kind cluster's incident-lab namespace, checkout calls inventory. "
-                                                + "The injected deployment points checkout at a nonexistent inventory DNS name: requests return HTTP 503 while the pod stays Ready. "
-                                                + "The agents inspect real logs and configuration. Human approval restores the known inventory URL, then live HTTP probes verify recovery."
+                                                + "Each injection randomly changes its inventory URL to trigger DNS failure, connection refusal or HTTP 404. Checkout returns HTTP 503 while the pod can stay Ready. "
+                                                + "The agents must identify the selected fault from real logs and configuration. Human approval restores the known inventory URL, then live HTTP probes verify recovery."
                                         );
                                     }
                                 );
@@ -378,10 +381,10 @@ public partial class IncidentCommanderApp
                                                         {
                                                             IncidentPhase.Healthy
                                                                 when _sms is not null =>
-                                                                "Inject Kubernetes fault & request SMS deploys the bad inventory URL "
+                                                                "Inject random Kubernetes fault & request SMS selects one dependency fault "
                                                                     + "and sends a real approval SMS if restoration is proposed.",
                                                             IncidentPhase.Healthy =>
-                                                                "Inject the bad inventory URL into checkout to start. The agents investigate before proposing restoration.",
+                                                                "Inject a random dependency fault into checkout. The agents investigate the evidence before proposing restoration.",
                                                             IncidentPhase.Resolved =>
                                                                 "Recovery verified. The incident report is ready below.",
                                                             IncidentPhase.Escalated =>
