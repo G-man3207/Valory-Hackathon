@@ -57,7 +57,7 @@ public sealed class ApprovalSms : IDisposable
     {
         ArgumentNullException.ThrowIfNull(approval);
         if (DateTimeOffset.UtcNow >= approval.ExpiresAt) return null;
-        var since = approval.ExpiresAt.AddMinutes(-5).UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
+        var since = approval.ExpiresAt.AddMinutes(-5).UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.ff", CultureInfo.InvariantCulture);
         using var response = await _http.GetAsync($"sms?limit=100&to={Uri.EscapeDataString(_from)}&end={Uri.EscapeDataString(since)}", token).ConfigureAwait(false);
         EnsureSuccess(response);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));

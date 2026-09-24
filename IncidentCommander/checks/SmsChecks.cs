@@ -17,6 +17,7 @@ internal static class SmsChecks
             Parse(valid.Replace("+46700000001", "+46700000003", StringComparison.Ordinal)) != null ||
             Parse(valid.Replace("+46700000002", "+46700000003", StringComparison.Ordinal)) != null ||
             Parse(valid.Replace("ABCD12", "STALE", StringComparison.Ordinal)) != null ||
+            Parse(valid.Replace("APPROVE ABCD12", "APPROVE", StringComparison.Ordinal)) != null ||
             Parse(valid, approval with { ExpiresAt = now }) != null ||
             Parse(valid, approval with { ExpiresAt = now.AddMinutes(6) }) != null ||
             Parse(valid.Replace($"{now:O}", $"{now.AddSeconds(1):O}", StringComparison.Ordinal)) != null ||
