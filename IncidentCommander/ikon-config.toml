@@ -1,0 +1,75 @@
+# Schema version of this config file. The ikon tool upgrades older files automatically and always
+# saves at its current version; a file newer than the tool refuses to load (update the tool).
+ConfigVersion = 5
+
+# Which of the space's databases backs PersistentReactive state. Empty means the platform picks — the
+# built-in "app" database, or your own when the space holds exactly one — and records the choice so
+# it does not move when databases are added or removed. Name one here only to override that. The name
+# must match a database the space holds ('ikon app db list'); an unknown name is reported and the app
+# falls back to asset storage rather than provisioning anything.
+StateDatabase = ""
+
+# Activation configuration for the app (app activation is separate from deployment)
+[Activation]
+# Whether to stop all active sessions of the app when a version of the app is activated
+StopSessions = true
+
+# Authentication configuration for the app frontend
+[Auth]
+# How visitors may enter: real sign-in providers (google, apple, microsoft, signicat, email,
+# passkey) plus two flavors of not-signed-in entry — "guest" gives each visitor their own
+# device-scoped anonymous user (private per-visitor sessions), while "global" gives ALL visitors
+# one shared space-wide anonymous user (they collapse onto a shared app instance — the
+# cost-efficient mode for public landing surfaces; pair with [Sharded] on the SessionIdentity
+# record to let it scale out; the app can distinguish a global visitor from a guest via
+# Context.IsGlobal). List both to enter as "global" by default and let the app upgrade a visitor
+# to a "guest" identity on demand. Signing in elevates to the real account from either.
+Methods = ["google", "apple", "microsoft", "signicat", "email", "passkey", "guest"]
+# If non-empty, only allow users with email addresses from these domains to authenticate (e.g. ["mycompany.com"])
+DomainAllowlist = []
+# When false (the default) visitors enter immediately as an anonymous session and can sign in on
+# demand — branch on Context.IsAnonymous in the app and trigger sign-in with ClientFunctions.LoginAsync("google").
+# When true the frontend shows a mandatory sign-in wall before the app loads; listing "guest" or
+# "global" in Methods adds a "Continue as guest" button to that wall. Anonymous browsing stays
+# SEO-crawlable via [BootSnapshot] Routes regardless.
+RequireSignIn = false
+
+# Boot snapshot: capture the app's initial UI at build/deploy time so the first paint appears
+# instantly. The snapshot is a PUBLIC asset, but it is privacy-safe by default — every piece of
+# content is automatically replaced with a skeleton, so no sensitive data is baked in. Use
+# SnapshotReveal to opt safe content (logos, static chrome) back in; a fully public landing-type
+# page opts out wholesale by wrapping its page root in SnapshotReveal. See the Parallax library
+# overview docs.
+[BootSnapshot]
+# Public routes to snapshot (e.g. ["/", "/pricing"]); an empty list disables boot snapshotting.
+# Routes must be paths the app serves directly — a route the app redirects away from during
+# capture fails the bundle/deploy, so declare the real path (e.g. "/home" instead of "/").
+# Each route's snapshot paints instantly on load, and for apps openable without signing in (no
+# sign-in wall, or "guest"/"global" in Auth.Methods) each route is also prerendered to crawlable
+# static HTML with a generated sitemap.xml/robots.txt. Content routes (one per listing/article)
+# can be added in app code via app.OnSnapshotRoutes(...). See the "Per-route snapshots and SEO"
+# section of the Parallax docs.
+Routes = ["/"]
+# Seed rules (only for apps that render different pages per identity or path shape): ordered
+# "pattern:variantId" entries, first match wins. A pattern segment is a literal, "*" (exactly one
+# segment), or a final "**" (any remainder) — so "/*:dashboard" seeds the dashboard skeleton on any
+# one-segment path and "/**:shell" on every path. Each distinct variant id is captured once as a
+# skeleton the app renders by branching on view.SnapshotVariant == "id". Guests seed an exact route
+# snapshot before these rules; signed-in visitors consult these rules first, then fall back to the
+# route snapshot. Variant skeletons are never prerendered to HTML and never listed in the sitemap.
+# GuestSeeds = ["/**:welcome"]
+GuestSeeds = []
+# SignedInSeeds = ["/**:shell"]
+SignedInSeeds = []
+
+# Custom packaging steps for 'ikon app bundle' and 'ikon app deploy'
+[Package]
+# Commands run in the app root after the app + frontend build, before the bundle is zipped. The bundle
+# staging directory is exposed as IKON_BUNDLE_DIR, so a command can write processed output straight
+# into the package (e.g. ["python scripts/pack_assets.py"])
+PrePackage = []
+
+# Target information for deployment (automatically configured with 'ikon app config')
+[Target]
+SpaceId = "6ab54f77a8dc8cffa804162b"
+Name = "IncidentCommander"

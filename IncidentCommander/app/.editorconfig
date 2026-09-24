@@ -1,0 +1,5 @@
+[*.cs]
+resharper_variable_hides_outer_variable_highlighting = none
+
+# Ikon scaffold and generated bindings require application types in the global namespace.
+dotnet_diagnostic.CA1050.severity = none

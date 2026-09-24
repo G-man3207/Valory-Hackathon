@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Config/">
+    <File Path="ikon-config.toml" />
+  </Folder>
+  <Folder Name="/App/">
+    <Project Path="app/IncidentCommander/IncidentCommander.csproj" />
+  </Folder>
+  <Folder Name="/Frontend/">
+    <Project Path="frontend-node/IncidentCommander.Frontend.Node.csproj" />
+  </Folder>
+</Solution>

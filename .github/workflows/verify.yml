@@ -1,0 +1,25 @@
+name: Verify
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: IncidentCommander/frontend-node/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: npm ci --prefix IncidentCommander/frontend-node
+      - run: npm --prefix IncidentCommander/frontend-node run lint
+      - run: npm --prefix IncidentCommander/frontend-node run typecheck
+      - run: npm --prefix IncidentCommander/frontend-node run build
+      - run: dotnet run --project IncidentCommander/checks/IncidentCommander.Checks.csproj --configuration Release
+      # Full Ikon build runs locally with ./verify.sh: SDK NuGet packages use the authenticated Ikon feed.
