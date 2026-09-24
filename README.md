@@ -28,7 +28,7 @@ Checkout is returning **HTTP 503**, but its pod is still **Ready**. Four AI role
 | --- | --- |
 | A real dependency failure | A randomly selected inventory URL change causes a DNS failure, connection failure or HTTP 404. |
 | Four distinct AI roles | Observability, Hypothesis, Critic and Commander work through the evidence in sequence. |
-| A human decision | Approve by SMS or use the explicitly labelled local lab fallback. Approval is bound to the incident and deployment. |
+| A human decision | Approve by [SMS](docs/demo.md#sms-on-the-phone) or use the explicitly labelled local lab fallback. Approval is bound to the incident and deployment. |
 | Verified recovery | The app restores the known inventory URL, probes checkout and produces a downloadable Markdown report. |
 
 All workload changes stay inside the local `incident-lab` namespace. No production systems are connected.

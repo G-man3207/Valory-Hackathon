@@ -2,7 +2,7 @@
 
 [← Back to the project](../README.md)
 
-These screenshots follow one run of the isolated Kubernetes demo on **24 September 2026**. Checkout is configured to call inventory on port `81`, while the inventory Service exposes port `80`. Requests time out and checkout returns HTTP 503, even though its pod stays Ready.
+The dashboard screenshots follow one run of the isolated Kubernetes demo on **24 September 2026**. Checkout is configured to call inventory on port `81`, while the inventory Service exposes port `80`. Requests time out and checkout returns HTTP 503, even though its pod stays Ready.
 
 Click a screenshot to inspect it at full resolution. The captures preserve the original UI and the agents' intermediate assessments.
 
@@ -25,6 +25,16 @@ The Commander proposes restoring the known inventory URL. The dashboard shows th
 ![The incident waiting for human approval, with the Commander's rationale and the labelled local lab fallback.](assets/03-approval.png)
 
 The approval shown belongs to this completed run and has already been consumed.
+
+### SMS on the phone
+
+The on-call phone receives the proposed action, the lab namespace and exact instructions to approve or deny within five minutes.
+
+<p align="center">
+  <a href="assets/sms-approval.png"><img src="assets/sms-approval.png" alt="Phone conversation showing Kubernetes lab approval requests and matching APPROVE replies from earlier demo runs, followed by the 23:21 request for the incident above." width="360" /></a>
+</p>
+
+The **23:21** request matches the approval code in the dashboard above. The visible `APPROVE` replies belong to earlier requests; the reply to this run is not shown in the phone capture.
 
 ## 4. Verify the result
 
