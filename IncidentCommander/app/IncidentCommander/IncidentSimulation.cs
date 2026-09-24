@@ -23,6 +23,10 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     public double ErrorRate { get; private set; } = 0.002;
     public int LatencyMs { get; private set; } = 180;
     public double ConnectionUsage { get; private set; } = 0.42;
+    public (double ErrorRate, int LatencyMs, double ConnectionUsage)? BeforeRecovery
+    {
+        get; private set;
+    }
     public IReadOnlyList<IncidentEvent> Events
     {
         get
@@ -61,6 +65,7 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
         ErrorRate = 0.002;
         LatencyMs = 180;
         ConnectionUsage = 0.42;
+        BeforeRecovery = null;
         PendingApproval = null;
         lock (_eventGate)
         {
@@ -181,6 +186,7 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     public void Rollback()
     {
         RequirePhase(IncidentPhase.Executing);
+        BeforeRecovery = (ErrorRate, LatencyMs, ConnectionUsage);
         DeploymentId = "7e30b1";
         ErrorRate = 0.003;
         LatencyMs = 210;

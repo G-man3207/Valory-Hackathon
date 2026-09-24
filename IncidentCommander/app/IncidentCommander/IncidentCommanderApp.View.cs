@@ -28,7 +28,7 @@ public partial class IncidentCommanderApp
                         {
                             if (busy)
                             {
-                                view.Spinner(size: SpinnerSize.Sm);
+                                view.Icon(["w-4 h-4 text-amber-300"], name: "activity");
                                 view.Text(["text-sm text-amber-300"], text: $"{_agent.Value} working");
                             }
                             if (phase == IncidentPhase.Healthy)
@@ -102,6 +102,41 @@ public partial class IncidentCommanderApp
                         });
                     });
 
+                    RenderIncidentRail(view, phase);
+
+                    if (phase == IncidentPhase.Resolved && _simulation.BeforeRecovery is { } before)
+                    {
+                        view.Column(["gap-4 p-4 bg-emerald-950 border border-emerald-800 rounded-sm"], content: view =>
+                        {
+                            view.Row(["gap-2 items-center text-emerald-200"], content: view =>
+                            {
+                                view.Icon(["w-4 h-4"], name: "circle-check");
+                                view.Heading(["text-base font-semibold"], text: "Recovery verified");
+                            });
+                            view.Text(
+                                ["text-xs text-emerald-200"],
+                                text: "Simulated metrics immediately before rollback and after verification.");
+                            view.Box(["grid grid-cols-1 sm:grid-cols-3 gap-4"], content: view =>
+                            {
+                                RenderRecoveryMetric(
+                                    view,
+                                    "Error rate",
+                                    before.ErrorRate.ToString("P1", CultureInfo.InvariantCulture),
+                                    _simulation.ErrorRate.ToString("P1", CultureInfo.InvariantCulture));
+                                RenderRecoveryMetric(
+                                    view,
+                                    "P95 latency",
+                                    $"{before.LatencyMs.ToString("N0", CultureInfo.InvariantCulture)} ms",
+                                    $"{_simulation.LatencyMs.ToString("N0", CultureInfo.InvariantCulture)} ms");
+                                RenderRecoveryMetric(
+                                    view,
+                                    "DB pool utilization",
+                                    before.ConnectionUsage.ToString("P0", CultureInfo.InvariantCulture),
+                                    _simulation.ConnectionUsage.ToString("P0", CultureInfo.InvariantCulture));
+                            });
+                        });
+                    }
+
                     if (!string.IsNullOrWhiteSpace(_error.Value))
                     {
                         view.Box(
@@ -146,6 +181,7 @@ public partial class IncidentCommanderApp
                                     ["default", "w-full min-h-11"],
                                     bind: _approvalCode,
                                     label: "Approval code",
+                                    ariaLabel: "Approval code",
                                     placeholder: "Enter the code above",
                                     disabled: busy,
                                     debounceMs: 0);
@@ -187,9 +223,15 @@ public partial class IncidentCommanderApp
                         {
                             view.Row(["gap-2 items-center"], content: view =>
                             {
-                                view.Icon(["w-4 h-4 text-amber-300"], name: "shield-check");
+                                RenderRoleIndicator(view, "Commander", "shield-check");
                                 view.Heading(["text-base font-semibold"], text: "Commander decision");
                             });
+                            if (_busy.Value && _agent.Value == "Commander")
+                            {
+                                view.Text(
+                                    ["text-xs text-amber-300"],
+                                    text: phase == IncidentPhase.Resolved ? "Writing incident report" : "Choosing next action");
+                            }
                             if (string.IsNullOrWhiteSpace(_decision.Value))
                             {
                                 view.Text(
@@ -308,6 +350,92 @@ public partial class IncidentCommanderApp
         });
     }
 
+    private static void RenderIncidentRail(IView view, IncidentPhase phase)
+    {
+        var active = phase switch
+        {
+            IncidentPhase.Investigating => 1,
+            IncidentPhase.WaitingForApproval => 2,
+            IncidentPhase.Executing or IncidentPhase.Verifying => 3,
+            _ => -1,
+        };
+        string[] labels = ["Detection", "Investigation", "Approval", "Recovery"];
+        string[] statuses = phase switch
+        {
+            IncidentPhase.Healthy => ["Standby", "Pending", "Pending", "Pending"],
+            IncidentPhase.Investigating => ["Detected", "In progress", "Pending", "Pending"],
+            IncidentPhase.WaitingForApproval => ["Detected", "Reviewed", "Required", "Pending"],
+            IncidentPhase.Executing => ["Detected", "Reviewed", "Approved", "Rolling back"],
+            IncidentPhase.Verifying => ["Detected", "Reviewed", "Approved", "Verifying"],
+            IncidentPhase.Resolved => ["Detected", "Reviewed", "Approved", "Verified"],
+            _ => ["Detected", "Stopped", "Closed", "Not verified"],
+        };
+        view.Box(["grid grid-cols-4 gap-2 border-b border-zinc-800 pb-4"], content: view =>
+        {
+            for (var index = 0; index < labels.Length; index++)
+            {
+                var current = index == active;
+                var label = labels[index];
+                var status = statuses[index];
+                var last = index == labels.Length - 1;
+                view.Column(["gap-1 min-w-0"], content: view =>
+                {
+                    view.Row(["gap-1 items-center"], content: view =>
+                    {
+                        view.Text(
+                            ["text-[11px] sm:text-xs font-semibold", current ? "text-amber-300" : "text-zinc-200"],
+                            text: label);
+                        if (!last)
+                        {
+                            view.Icon(["hidden sm:block w-3 h-3 text-zinc-500 shrink-0"], name: "chevron-right");
+                        }
+                    });
+                    view.Text(
+                        ["text-xs", current ? "text-amber-300" : phase == IncidentPhase.Resolved ? "text-emerald-300" : "text-zinc-400"],
+                        text: status);
+                });
+            }
+        });
+    }
+
+    private void RenderRoleIndicator(IView view, string role, string idleIcon)
+    {
+        var active = _busy.Value && _agent.Value == role;
+        view.Icon(
+            [
+                "w-4 h-4 shrink-0",
+                active ? "text-amber-300" : "text-zinc-400",
+                active ? "motion-safe:motion-[0:opacity-100,25:opacity-50,50:opacity-100,75:opacity-50,100:opacity-100]" : "",
+                active ? "motion-safe:motion-duration-2s motion-safe:motion-once" : "",
+            ],
+            name: active ? "activity" : idleIcon,
+            props: new Dictionary<string, object>
+            {
+                ["data-incident-active-role"] = active ? "true" : "false",
+            });
+    }
+
+    private static void RenderRecoveryMetric(IView view, string label, string before, string after)
+    {
+        view.Box(
+            ["flex flex-col gap-1"],
+            props: new Dictionary<string, object>
+            {
+                ["role"] = "group",
+                ["aria-label"] = $"{label}: before rollback {before}; after verification {after}",
+            },
+            content: view =>
+        {
+            view.Text(["text-xs text-emerald-200"], text: label);
+            view.Row(["gap-2 items-center flex-wrap tabular-nums"], content: view =>
+            {
+                view.Text(["text-base text-emerald-200"], text: before);
+                view.Icon(["w-4 h-4 text-emerald-300"], name: "arrow-right");
+                view.Text(["text-xl font-semibold text-emerald-100"], text: after);
+            });
+        });
+    }
+
     private static void RenderMetric(IView view, string label, string value, bool degraded)
     {
         view.Column(["gap-1 min-w-0"], content: view =>
@@ -335,14 +463,20 @@ public partial class IncidentCommanderApp
             {
                 view.Row(["gap-2 items-center"], content: view =>
                 {
-                    view.Icon(
-                        ["w-4 h-4", _agent.Value == role ? "text-amber-300" : "text-zinc-400"],
-                        name: string.IsNullOrWhiteSpace(output) ? "circle" : "circle-check");
+                    RenderRoleIndicator(view, role, string.IsNullOrWhiteSpace(output) ? "circle" : "circle-check");
                     view.Text(["text-sm font-semibold"], text: role);
                 });
                 view.Row(["gap-2 items-center"], content: view =>
                 {
-                    view.Text(["text-xs text-zinc-400"], text: purpose);
+                    view.Text(
+                        ["text-xs", _busy.Value && _agent.Value == role ? "text-amber-300" : "text-zinc-400"],
+                        text: _busy.Value && _agent.Value == role ? role switch
+                        {
+                            "Observability" => "Collecting signals",
+                            "Hypothesis" => "Ranking causes",
+                            "Critic" => "Checking evidence",
+                            _ => purpose,
+                        } : purpose);
                     view.Icon(["w-4 h-4 text-zinc-400"], name: "chevron-down");
                 });
             });

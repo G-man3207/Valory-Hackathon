@@ -19,3 +19,10 @@
      }
 
    The full token list is in @ikonai/sdk-react-ui/theme/ikon-tokens.css. */
+
+
+@media (prefers-reduced-motion: reduce) {
+  [data-incident-active-role] {
+    animation: none !important;
+  }
+}
