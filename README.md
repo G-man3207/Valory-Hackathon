@@ -13,7 +13,7 @@ cd IncidentCommander
 ikon app run --no-auto-frontend-login
 ```
 
-`verify.sh` requires zero ESLint warnings, strict TypeScript, a frontend build, a C# build with warnings as errors, clean C# whitespace, and executable domain/SMS checks. The generated SDK frontend currently emits a bundle-size advisory. GitHub CI runs the frontend and dependency-free checks; the full backend build needs the authenticated Ikon package feed and runs locally.
+`verify.sh` runs locally and requires zero ESLint warnings, strict TypeScript, a frontend build, a C# build with warnings as errors, clean C# whitespace, and executable domain/SMS checks. The generated SDK frontend currently emits a bundle-size advisory. The backend build needs the authenticated Ikon package feed.
 
 ## Demo
 
@@ -46,4 +46,4 @@ One database-connection leak fixture, five investigative tools, one guarded roll
 
 The separate [seed lab](lab/README.md) runs checkout and inventory on a real local Kubernetes cluster. `./lab/lab.sh check` verifies healthy HTTP 200, an injected deployment causing a real dependency DNS failure and HTTP 503, then recovery to HTTP 200. `break`, `evidence`, and `recover` support manual investigation. The Ikon dashboard still uses its original in-memory simulation; it does not yet read or change this cluster.
 
-Local verification additionally requires ShellCheck and Python 3. CI checks shell scripts and Python syntax; the cluster integration check runs explicitly on the devbox.
+Local verification additionally requires ShellCheck and Python 3 for shell checks and Python syntax validation. The cluster integration check runs explicitly on the devbox.
