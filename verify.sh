@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+node --check dev.mjs
+node IncidentCommander/frontend-node/node_modules/eslint/bin/eslint.js --config IncidentCommander/frontend-node/eslint.config.js dev.mjs --max-warnings=0
 app=IncidentCommander/app/IncidentCommander/IncidentCommander.csproj
 npm --prefix IncidentCommander/frontend-node run lint
 npm --prefix IncidentCommander/frontend-node run typecheck

@@ -9,5 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../app/IncidentCommander/IncidentSimulation.cs" Link="IncidentSimulation.cs" />
+    <Compile Include="../app/IncidentCommander/ApprovalSms.cs" Link="ApprovalSms.cs" />
   </ItemGroup>
 </Project>

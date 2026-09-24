@@ -47,7 +47,18 @@ Reject(() => simulation.Rollback());
 simulation.VerifyRecovery();
 Check(simulation.Phase == IncidentPhase.Resolved && simulation.ErrorRate < 0.01, "Approved rollback must recover.");
 Check(simulation.Events.Zip(simulation.Events.Skip(1)).All(pair => pair.First.At <= pair.Second.At), "Timeline must be ordered.");
+var snapshot = simulation.Events;
+var snapshotCount = snapshot.Count;
+Parallel.For(0, 100, _ =>
+{
+    simulation.Record("Check", "Concurrent event.");
+    foreach (var entry in simulation.Events) Check(entry is not null, "Snapshots must contain complete events.");
+});
+Check(simulation.Events.Count == snapshotCount + 100, "Concurrent writes must not lose events.");
+simulation.Reset();
+Check(snapshot.Count == snapshotCount && simulation.Events.Count == 0, "Rendering snapshots must survive writes and reset.");
 Console.WriteLine("Incident simulation checks passed.");
+SmsChecks.Run();
 
 static void Check(bool condition, string message)
 {

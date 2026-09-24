@@ -9,6 +9,7 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private readonly List<IncidentEvent> _events = [];
+    private readonly Lock _eventGate = new();
     private DateTimeOffset _startedAt;
     public IncidentPhase Phase { get; private set; }
     public string Id { get; private set; } = "";
@@ -16,7 +17,10 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     public double ErrorRate { get; private set; } = 0.002;
     public int LatencyMs { get; private set; } = 180;
     public double ConnectionUsage { get; private set; } = 0.42;
-    public IReadOnlyList<IncidentEvent> Events => _events.AsReadOnly();
+    public IReadOnlyList<IncidentEvent> Events
+    {
+        get { lock (_eventGate) { return _events.ToArray(); } }
+    }
     public ApprovalRequest? PendingApproval { get; private set; }
 
     public void Inject()
@@ -43,7 +47,7 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
         LatencyMs = 180;
         ConnectionUsage = 0.42;
         PendingApproval = null;
-        _events.Clear();
+        lock (_eventGate) { _events.Clear(); }
         _startedAt = _time.GetUtcNow();
     }
 
@@ -114,7 +118,7 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actor);
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        _events.Add(new(_time.GetUtcNow(), actor, message));
+        lock (_eventGate) { _events.Add(new(_time.GetUtcNow(), actor, message)); }
     }
 
     public void ProposeRollback()
