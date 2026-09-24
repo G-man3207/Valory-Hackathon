@@ -18,6 +18,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: npm ci --prefix IncidentCommander/frontend-node
+      - run: shellcheck --severity=style verify.sh lab/lab.sh
+      - run: python3 -W error -c 'from pathlib import Path; compile(Path("lab/server.py").read_text(), "lab/server.py", "exec")'
       - run: node --check dev.mjs
       - run: node IncidentCommander/frontend-node/node_modules/eslint/bin/eslint.js --config IncidentCommander/frontend-node/eslint.config.js dev.mjs --max-warnings=0
       - run: npm --prefix IncidentCommander/frontend-node run lint

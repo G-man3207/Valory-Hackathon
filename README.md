@@ -41,3 +41,9 @@ With SMS configured, the **Inject incident & request SMS** action can send one r
 ## Current scope
 
 One database-connection leak fixture, five investigative tools, one guarded rollback, four real AI roles, a responsive native Ikon dashboard, and an incident report. One incident per session; no production integrations or durable incident history. Tailscale controls access to the development preview; the local approval fallback is for the simulation, not production authorization.
+
+## Real Kubernetes lab
+
+The separate [seed lab](lab/README.md) runs checkout and inventory on a real local Kubernetes cluster. `./lab/lab.sh check` verifies healthy HTTP 200, an injected deployment causing a real dependency DNS failure and HTTP 503, then recovery to HTTP 200. `break`, `evidence`, and `recover` support manual investigation. The Ikon dashboard still uses its original in-memory simulation; it does not yet read or change this cluster.
+
+Local verification additionally requires ShellCheck and Python 3. CI checks shell scripts and Python syntax; the cluster integration check runs explicitly on the devbox.
