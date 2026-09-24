@@ -52,7 +52,8 @@ var snapshotCount = snapshot.Count;
 Parallel.For(0, 100, _ =>
 {
     simulation.Record("Check", "Concurrent event.");
-    foreach (var entry in simulation.Events) Check(entry is not null, "Snapshots must contain complete events.");
+    foreach (var entry in simulation.Events)
+        Check(entry is not null, "Snapshots must contain complete events.");
 });
 Check(simulation.Events.Count == snapshotCount + 100, "Concurrent writes must not lose events.");
 simulation.Reset();
@@ -62,14 +63,24 @@ SmsChecks.Run();
 
 static void Check(bool condition, string message)
 {
-    if (!condition) throw new InvalidOperationException(message);
+    if (!condition)
+        throw new InvalidOperationException(message);
 }
 
 static void Reject(Action action)
 {
-    try { action(); }
-    catch (InvalidOperationException) { return; }
-    catch (ArgumentException) { return; }
+    try
+    {
+        action();
+    }
+    catch (InvalidOperationException)
+    {
+        return;
+    }
+    catch (ArgumentException)
+    {
+        return;
+    }
     throw new InvalidOperationException("Expected invalid action to be rejected.");
 }
 

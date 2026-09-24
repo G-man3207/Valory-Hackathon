@@ -24,27 +24,51 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
 
   const port = Number(process.env.VITE_SERVER_PORT || env.VITE_SERVER_PORT || 9443);
-  const frontendHost = process.env.VITE_SERVER_FRONTEND_HOST || env.VITE_SERVER_FRONTEND_HOST || 'localhost';
-  const frontendPort = Number(process.env.VITE_SERVER_FRONTEND_PORT || env.VITE_SERVER_FRONTEND_PORT || port);
-  const frontendUrl = process.env.VITE_SERVER_FRONTEND_URL || env.VITE_SERVER_FRONTEND_URL || `https://${frontendHost}:${frontendPort}`;
-  const openBrowser = (process.env.VITE_SERVER_OPEN_BROWSER || env.VITE_SERVER_OPEN_BROWSER) === 'true';
+  const frontendHost =
+    process.env.VITE_SERVER_FRONTEND_HOST || env.VITE_SERVER_FRONTEND_HOST || 'localhost';
+  const frontendPort = Number(
+    process.env.VITE_SERVER_FRONTEND_PORT || env.VITE_SERVER_FRONTEND_PORT || port,
+  );
+  const frontendUrl =
+    process.env.VITE_SERVER_FRONTEND_URL ||
+    env.VITE_SERVER_FRONTEND_URL ||
+    `https://${frontendHost}:${frontendPort}`;
+  const openBrowser =
+    (process.env.VITE_SERVER_OPEN_BROWSER || env.VITE_SERVER_OPEN_BROWSER) === 'true';
   const isTunneled = (process.env.VITE_SERVER_TUNNELED || env.VITE_SERVER_TUNNELED) === 'true';
-  const authRequireSignIn = (process.env.VITE_IKON_AUTH_REQUIRE_SIGN_IN || env.VITE_IKON_AUTH_REQUIRE_SIGN_IN) === 'true';
-  const authMethods = process.env.VITE_IKON_AUTH_METHODS || env.VITE_IKON_AUTH_METHODS ? JSON.parse(process.env.VITE_IKON_AUTH_METHODS || env.VITE_IKON_AUTH_METHODS) : ['google'];
+  const authRequireSignIn =
+    (process.env.VITE_IKON_AUTH_REQUIRE_SIGN_IN || env.VITE_IKON_AUTH_REQUIRE_SIGN_IN) === 'true';
+  const authMethods =
+    process.env.VITE_IKON_AUTH_METHODS || env.VITE_IKON_AUTH_METHODS
+      ? JSON.parse(process.env.VITE_IKON_AUTH_METHODS || env.VITE_IKON_AUTH_METHODS)
+      : ['google'];
   const authSpaceId = process.env.VITE_IKON_AUTH_SPACE_ID ?? env.VITE_IKON_AUTH_SPACE_ID ?? '';
   const backendUrl = process.env.VITE_IKON_BACKEND_URL || env.VITE_IKON_BACKEND_URL || '';
   const authUrl = process.env.VITE_IKON_AUTH_URL || env.VITE_IKON_AUTH_URL || '';
-  const devLoginToken = process.env.VITE_IKON_DEV_LOGIN_TOKEN || env.VITE_IKON_DEV_LOGIN_TOKEN || '';
-  const devLoginRunId = process.env.VITE_IKON_DEV_LOGIN_RUN_ID || env.VITE_IKON_DEV_LOGIN_RUN_ID || '';
-  const waitForExternalConnectUrl = (process.env.VITE_WAIT_FOR_EXTERNAL_CONNECT_URL || env.VITE_WAIT_FOR_EXTERNAL_CONNECT_URL) === 'true';
-  const localIkonServerEnabled = (process.env.VITE_LOCAL_IKON_SERVER_ENABLED || env.VITE_LOCAL_IKON_SERVER_ENABLED) === 'true';
-  const localIkonServerHost = process.env.VITE_LOCAL_IKON_SERVER_HOST || env.VITE_LOCAL_IKON_SERVER_HOST || 'localhost';
-  const localIkonServerPort = Number(process.env.VITE_LOCAL_IKON_SERVER_PORT || env.VITE_LOCAL_IKON_SERVER_PORT || '8443');
-  const certPath = (process.env.VITE_IKON_SERVER_CERT_PATH || env.VITE_IKON_SERVER_CERT_PATH)?.trim();
+  const devLoginToken =
+    process.env.VITE_IKON_DEV_LOGIN_TOKEN || env.VITE_IKON_DEV_LOGIN_TOKEN || '';
+  const devLoginRunId =
+    process.env.VITE_IKON_DEV_LOGIN_RUN_ID || env.VITE_IKON_DEV_LOGIN_RUN_ID || '';
+  const waitForExternalConnectUrl =
+    (process.env.VITE_WAIT_FOR_EXTERNAL_CONNECT_URL || env.VITE_WAIT_FOR_EXTERNAL_CONNECT_URL) ===
+    'true';
+  const localIkonServerEnabled =
+    (process.env.VITE_LOCAL_IKON_SERVER_ENABLED || env.VITE_LOCAL_IKON_SERVER_ENABLED) === 'true';
+  const localIkonServerHost =
+    process.env.VITE_LOCAL_IKON_SERVER_HOST || env.VITE_LOCAL_IKON_SERVER_HOST || 'localhost';
+  const localIkonServerPort = Number(
+    process.env.VITE_LOCAL_IKON_SERVER_PORT || env.VITE_LOCAL_IKON_SERVER_PORT || '8443',
+  );
+  const certPath = (
+    process.env.VITE_IKON_SERVER_CERT_PATH || env.VITE_IKON_SERVER_CERT_PATH
+  )?.trim();
   const keyPath = (process.env.VITE_IKON_SERVER_KEY_PATH || env.VITE_IKON_SERVER_KEY_PATH)?.trim();
-  const hasCertificate = !isTunneled && certPath && keyPath && existsSync(certPath) && existsSync(keyPath);
-  const isIkonInternal = (process.env.VITE_IS_IKON_INTERNAL || env.VITE_IS_IKON_INTERNAL) === 'true';
-  const platformTypescriptPath = process.env.VITE_IKON_PLATFORM_TYPESCRIPT_PATH || env.VITE_IKON_PLATFORM_TYPESCRIPT_PATH;
+  const hasCertificate =
+    !isTunneled && certPath && keyPath && existsSync(certPath) && existsSync(keyPath);
+  const isIkonInternal =
+    (process.env.VITE_IS_IKON_INTERNAL || env.VITE_IS_IKON_INTERNAL) === 'true';
+  const platformTypescriptPath =
+    process.env.VITE_IKON_PLATFORM_TYPESCRIPT_PATH || env.VITE_IKON_PLATFORM_TYPESCRIPT_PATH;
 
   const plugins = [ikonEmbedHeaders, react()];
 
@@ -52,7 +76,11 @@ export default defineConfig(({ mode }) => {
     plugins.push(basicSsl());
   }
 
-  const httpsConfig = isTunneled ? false : hasCertificate ? { cert: readFileSync(certPath), key: readFileSync(keyPath) } : true;
+  const httpsConfig = isTunneled
+    ? false
+    : hasCertificate
+      ? { cert: readFileSync(certPath), key: readFileSync(keyPath) }
+      : true;
   const resolveConfig = {};
 
   if (isIkonInternal && platformTypescriptPath) {
@@ -62,7 +90,10 @@ export default defineConfig(({ mode }) => {
       '@ikonai/sdk': resolve(platformTypescriptPath, 'sdk/sdk/src/index.ts'),
       '@ikonai/sdk-libopus': resolve(platformTypescriptPath, 'sdk/sdk-libopus/src/index.ts'),
       '@ikonai/sdk-react-ui': resolve(platformTypescriptPath, 'sdk/sdk-react-ui/src/index.ts'),
-      '@ikonai/sdk-react-ui-standard': resolve(platformTypescriptPath, 'sdk/sdk-react-ui-standard/src/index.ts'),
+      '@ikonai/sdk-react-ui-standard': resolve(
+        platformTypescriptPath,
+        'sdk/sdk-react-ui-standard/src/index.ts',
+      ),
       '@ikonai/sdk-ui': resolve(platformTypescriptPath, 'sdk/sdk-ui/src/index.ts'),
       '@ikonai/configs': resolve(platformTypescriptPath, 'shared/configs/src/index.ts'),
       '@ikonai/protocol': resolve(platformTypescriptPath, 'shared/protocol/src/index.ts'),
@@ -91,7 +122,9 @@ export default defineConfig(({ mode }) => {
     cacheDir: 'node_modules/.ikon-vite-cache',
     // The app folder contract: static web files live in the app root's public/, one level above
     // frontend-node. An app not yet migrated keeps Vite's local default.
-    publicDir: existsSync(resolve(__dirname, '../public')) ? resolve(__dirname, '../public') : 'public',
+    publicDir: existsSync(resolve(__dirname, '../public'))
+      ? resolve(__dirname, '../public')
+      : 'public',
     plugins,
     resolve: resolveConfig,
     worker: {

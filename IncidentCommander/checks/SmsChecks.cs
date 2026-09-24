@@ -18,10 +18,17 @@ internal static class SmsChecks
             Parse(valid.Replace("+46700000002", "+46700000003", StringComparison.Ordinal)) != null ||
             Parse(valid.Replace("ABCD12", "STALE", StringComparison.Ordinal)) != null ||
             Parse(valid.Replace("APPROVE ABCD12", "APPROVE", StringComparison.Ordinal)) != null ||
-            Parse(valid, approval with { ExpiresAt = now }) != null ||
-            Parse(valid, approval with { ExpiresAt = now.AddMinutes(6) }) != null ||
+            Parse(valid, approval with
+            {
+                ExpiresAt = now
+            }) != null ||
+            Parse(valid, approval with
+            {
+                ExpiresAt = now.AddMinutes(6)
+            }) != null ||
             Parse(valid.Replace($"{now:O}", $"{now.AddSeconds(1):O}", StringComparison.Ordinal)) != null ||
-            Parse(valid.Replace("APPROVE ABCD12", "APPROVE ABCD12 extra", StringComparison.Ordinal)) != null || Parse("{\"data\":[null,{}]}") != null)
+            Parse(valid.Replace("APPROVE ABCD12", "APPROVE ABCD12 extra", StringComparison.Ordinal)) != null ||
+            Parse("{\"data\":[null,{}]}") != null)
             throw new InvalidOperationException("SMS approval trust boundary check failed.");
         Console.WriteLine("SMS parser checks passed.");
     }

@@ -1,6 +1,12 @@
 import './app.css';
 
-import { AuthProvider, IkonApp, getConnectionRecovery, useAuthOptional, useIkonApp } from '@ikonai/sdk-react-ui';
+import {
+  AuthProvider,
+  IkonApp,
+  getConnectionRecovery,
+  useAuthOptional,
+  useIkonApp,
+} from '@ikonai/sdk-react-ui';
 import { registerStandardUiModule, registerLucideIconsModule } from '@ikonai/sdk-react-ui-standard';
 import { AuthGuard } from './auth/auth-guard';
 import { authConfig } from './env';
@@ -29,7 +35,14 @@ function AuthorizedApp() {
       {...app}
       connectingOverlay={(isSlow) => (isSlow ? <ConnectingOverlay /> : null)}
       reconnectingOverlay={<ReconnectingOverlay />}
-      offlineOverlay={(error) => <OfflineOverlay error={error} isServerFull={app.isServerFull} isSessionExpired={app.isSessionExpired} isStartupFailed={app.isStartupFailed} />}
+      offlineOverlay={(error) => (
+        <OfflineOverlay
+          error={error}
+          isServerFull={app.isServerFull}
+          isSessionExpired={app.isSessionExpired}
+          isStartupFailed={app.isStartupFailed}
+        />
+      )}
       accessDeniedScreen={(reason) => <AccessDeniedScreen reason={reason} />}
     />
   );
@@ -59,11 +72,27 @@ function ReconnectingOverlay() {
   );
 }
 
-function OfflineOverlay({ error, isServerFull, isSessionExpired, isStartupFailed }: { error: string | null; isServerFull: boolean; isSessionExpired: boolean; isStartupFailed: boolean }) {
+function OfflineOverlay({
+  error,
+  isServerFull,
+  isSessionExpired,
+  isStartupFailed,
+}: {
+  error: string | null;
+  isServerFull: boolean;
+  isSessionExpired: boolean;
+  isStartupFailed: boolean;
+}) {
   const { t } = useI18n();
 
   const isTerminal = isServerFull || isSessionExpired || isStartupFailed;
-  const scope = isServerFull ? 'serverFull' : isSessionExpired ? 'sessionExpired' : isStartupFailed ? 'startupFailed' : 'offline';
+  const scope = isServerFull
+    ? 'serverFull'
+    : isSessionExpired
+      ? 'sessionExpired'
+      : isStartupFailed
+        ? 'startupFailed'
+        : 'offline';
   const recovery = getConnectionRecovery({ isSessionExpired });
   return (
     <div className="ikon-offline-overlay">

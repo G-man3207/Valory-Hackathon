@@ -9,7 +9,10 @@ export default [
     linterOptions: { reportUnusedDisableDirectives: 'error' },
   },
   eslintJs.configs.recommended,
-  ...tseslint.configs.strictTypeChecked.map((config) => ({ ...config, files: ['**/*.ts', '**/*.tsx'] })),
+  ...tseslint.configs.strictTypeChecked.map((config) => ({
+    ...config,
+    files: ['**/*.ts', '**/*.tsx'],
+  })),
   eslintReact.configs['recommended-typescript'],
   {
     files: ['**/*.ts', '**/*.tsx'],

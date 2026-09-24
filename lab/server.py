@@ -1,4 +1,5 @@
 """Small real dependency failure for the local incident lab; no simulated signals."""
+
 import json
 import os
 import time
@@ -25,7 +26,11 @@ class Handler(BaseHTTPRequestHandler):
                 result = {"status": "ok", "inventory": inventory}
             except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
                 status = 503
-                result = {"status": "unavailable", "dependency": "inventory", "error": str(error)}
+                result = {
+                    "status": "unavailable",
+                    "dependency": "inventory",
+                    "error": str(error),
+                }
         else:
             status = 404
             result = {"error": "unknown endpoint"}
@@ -36,12 +41,21 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
         if self.path not in ("/healthz", "/readyz"):
-            print(json.dumps({
-                "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "service": ROLE, "path": self.path, "status": status,
-                "duration_ms": round((time.monotonic() - started) * 1000, 2),
-                **({"dependency_url": INVENTORY_URL, "error": result["error"]} if status == 503 else {}),
-            }), flush=True)
+            print(
+                json.dumps({
+                    "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "service": ROLE,
+                    "path": self.path,
+                    "status": status,
+                    "duration_ms": round((time.monotonic() - started) * 1000, 2),
+                    **(
+                        {"dependency_url": INVENTORY_URL, "error": result["error"]}
+                        if status == 503
+                        else {}
+                    ),
+                }),
+                flush=True,
+            )
 
     def log_message(self, format, *args):
         pass

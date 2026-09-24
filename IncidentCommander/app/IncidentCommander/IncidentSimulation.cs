@@ -1,7 +1,10 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 
-public enum IncidentPhase { Healthy, Investigating, WaitingForApproval, Executing, Verifying, Resolved, Escalated }
+public enum IncidentPhase
+{
+    Healthy, Investigating, WaitingForApproval, Executing, Verifying, Resolved, Escalated
+}
 public sealed record IncidentEvent(DateTimeOffset At, string Actor, string Message);
 public sealed record ApprovalRequest(string Code, string IncidentId, string DeploymentId, DateTimeOffset ExpiresAt);
 
@@ -11,7 +14,10 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     private readonly List<IncidentEvent> _events = [];
     private readonly Lock _eventGate = new();
     private DateTimeOffset _startedAt;
-    public IncidentPhase Phase { get; private set; }
+    public IncidentPhase Phase
+    {
+        get; private set;
+    }
     public string Id { get; private set; } = "";
     public string DeploymentId { get; private set; } = "7e30b1";
     public double ErrorRate { get; private set; } = 0.002;
@@ -19,9 +25,18 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     public double ConnectionUsage { get; private set; } = 0.42;
     public IReadOnlyList<IncidentEvent> Events
     {
-        get { lock (_eventGate) { return _events.ToArray(); } }
+        get
+        {
+            lock (_eventGate)
+            {
+                return _events.ToArray();
+            }
+        }
     }
-    public ApprovalRequest? PendingApproval { get; private set; }
+    public ApprovalRequest? PendingApproval
+    {
+        get; private set;
+    }
 
     public void Inject()
     {
@@ -47,7 +62,10 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
         LatencyMs = 180;
         ConnectionUsage = 0.42;
         PendingApproval = null;
-        lock (_eventGate) { _events.Clear(); }
+        lock (_eventGate)
+        {
+            _events.Clear();
+        }
         _startedAt = _time.GetUtcNow();
     }
 
@@ -66,7 +84,12 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
                 error_rate = ErrorRate,
                 p95_latency_ms = LatencyMs,
                 db_connection_usage = ConnectionUsage,
-                baseline = new { error_rate = 0.002, p95_latency_ms = 180, db_connection_usage = 0.42 },
+                baseline = new
+                {
+                    error_rate = 0.002,
+                    p95_latency_ms = 180,
+                    db_connection_usage = 0.42
+                },
                 request_rate_change = 0.03
             },
             "get_logs" => new
@@ -75,7 +98,11 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
                 observed_at = observedAt,
                 service = "checkout-api",
                 entries = degraded
-                    ? new[] { "Timeout acquiring PostgreSQL connection after 3000ms", "POST /checkout returned 503: connection pool exhausted" }
+                    ? new[]
+                    {
+                        "Timeout acquiring PostgreSQL connection after 3000ms",
+                        "POST /checkout returned 503: connection pool exhausted"
+                    }
                     : new[] { "POST /checkout returned 200", "PostgreSQL connection acquired in 4ms" }
             },
             "get_recent_deployments" => new
@@ -118,7 +145,10 @@ public sealed class IncidentSimulation(TimeProvider? timeProvider = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actor);
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        lock (_eventGate) { _events.Add(new(_time.GetUtcNow(), actor, message)); }
+        lock (_eventGate)
+        {
+            _events.Add(new(_time.GetUtcNow(), actor, message));
+        }
     }
 
     public void ProposeRollback()

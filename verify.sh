@@ -4,7 +4,8 @@ cd "$(dirname "$0")"
 shellcheck --severity=style verify.sh lab/lab.sh
 python3 -W error -c 'from pathlib import Path; compile(Path("lab/server.py").read_text(), "lab/server.py", "exec")'
 node --check dev.mjs
-node IncidentCommander/frontend-node/node_modules/eslint/bin/eslint.js --config IncidentCommander/frontend-node/eslint.config.js dev.mjs --max-warnings=0
+node IncidentCommander/frontend-node/node_modules/eslint/bin/eslint.js \
+  --config IncidentCommander/frontend-node/eslint.config.js dev.mjs --max-warnings=0
 app=IncidentCommander/app/IncidentCommander/IncidentCommander.csproj
 npm --prefix IncidentCommander/frontend-node run lint
 npm --prefix IncidentCommander/frontend-node run typecheck

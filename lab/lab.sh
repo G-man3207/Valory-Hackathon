@@ -20,7 +20,8 @@ set_dependency() {
 assert_status() {
   local expected=$1 actual
   for ((attempt=0; attempt<15; attempt++)); do
-    if ! actual=$(curl --silent --show-error --max-time 4 --output /dev/null --write-out '%{http_code}' "$base_url/checkout"); then
+    if ! actual=$(curl --silent --show-error --max-time 4 \
+      --output /dev/null --write-out '%{http_code}' "$base_url/checkout"); then
       actual=000
     fi
     if [[ "$actual" == "$expected" ]]; then

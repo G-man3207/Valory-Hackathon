@@ -69,8 +69,12 @@ window.__IKON_AUTH_CONFIG__ = {
   spaceId: __IKON_AUTH_SPACE_ID__,
   ...(__IKON_BACKEND_URL__ ? { backendUrl: __IKON_BACKEND_URL__ } : {}),
   ...(__IKON_AUTH_URL__ ? { authUrl: __IKON_AUTH_URL__ } : {}),
-  ...(typeof __IKON_DEV_LOGIN_TOKEN__ !== 'undefined' && __IKON_DEV_LOGIN_TOKEN__ ? { devLoginToken: __IKON_DEV_LOGIN_TOKEN__ } : {}),
-  ...(typeof __IKON_DEV_LOGIN_RUN_ID__ !== 'undefined' && __IKON_DEV_LOGIN_RUN_ID__ ? { devLoginRunId: __IKON_DEV_LOGIN_RUN_ID__ } : {}),
+  ...(typeof __IKON_DEV_LOGIN_TOKEN__ !== 'undefined' && __IKON_DEV_LOGIN_TOKEN__
+    ? { devLoginToken: __IKON_DEV_LOGIN_TOKEN__ }
+    : {}),
+  ...(typeof __IKON_DEV_LOGIN_RUN_ID__ !== 'undefined' && __IKON_DEV_LOGIN_RUN_ID__
+    ? { devLoginRunId: __IKON_DEV_LOGIN_RUN_ID__ }
+    : {}),
 };
 
 window.__IKON_LOCAL_IKON_SERVER_CONFIG__ = {

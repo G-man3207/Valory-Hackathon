@@ -91,7 +91,12 @@ export function EmailLoginForm({ config, onAttempt }: EmailLoginFormProps) {
 
   if (step === 'code') {
     return (
-      <form className="ikon-auth-email-form" onSubmit={(event) => { void handleSubmitCode(event); }}>
+      <form
+        className="ikon-auth-email-form"
+        onSubmit={(event) => {
+          void handleSubmitCode(event);
+        }}
+      >
         {errorMessage && <div className="ikon-auth-error">{errorMessage}</div>}
         <p className="ikon-auth-email-code-hint">
           {t('auth.email.sent.message')} <strong>{email}</strong>
@@ -99,7 +104,9 @@ export function EmailLoginForm({ config, onAttempt }: EmailLoginFormProps) {
         <input
           type="text"
           value={code}
-          onChange={(event) => { setCode(event.target.value.toUpperCase()); }}
+          onChange={(event) => {
+            setCode(event.target.value.toUpperCase());
+          }}
           placeholder={t('auth.email.code.placeholder')}
           className="ikon-auth-code-input"
           disabled={status === 'verifying'}
@@ -117,7 +124,12 @@ export function EmailLoginForm({ config, onAttempt }: EmailLoginFormProps) {
             t('auth.email.code.submit')
           )}
         </button>
-        <button type="button" className="ikon-auth-email-resend" onClick={backToEmail} disabled={status === 'verifying'}>
+        <button
+          type="button"
+          className="ikon-auth-email-resend"
+          onClick={backToEmail}
+          disabled={status === 'verifying'}
+        >
           {t('auth.email.code.back')}
         </button>
       </form>
@@ -125,12 +137,19 @@ export function EmailLoginForm({ config, onAttempt }: EmailLoginFormProps) {
   }
 
   return (
-    <form className="ikon-auth-email-form" onSubmit={(event) => { void handleSendCode(event); }}>
+    <form
+      className="ikon-auth-email-form"
+      onSubmit={(event) => {
+        void handleSendCode(event);
+      }}
+    >
       {errorMessage && <div className="ikon-auth-error">{errorMessage}</div>}
       <input
         type="email"
         value={email}
-        onChange={(event) => { setEmail(event.target.value); }}
+        onChange={(event) => {
+          setEmail(event.target.value);
+        }}
         placeholder={t('auth.email.placeholder')}
         className="ikon-auth-email-input"
         disabled={status === 'sending'}

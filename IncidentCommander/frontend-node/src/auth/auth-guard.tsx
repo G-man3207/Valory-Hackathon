@@ -29,7 +29,13 @@ export function formatAuthError(error: string): string {
 }
 
 export function AuthGuard({ children, config }: AuthGuardProps) {
-  const { isCheckingAuth, shouldRenderChildren, isLoginPrompt, dismissLoginPrompt, loginPromptReason } = useAuthGuard({
+  const {
+    isCheckingAuth,
+    shouldRenderChildren,
+    isLoginPrompt,
+    dismissLoginPrompt,
+    loginPromptReason,
+  } = useAuthGuard({
     config,
     guestUrlParam: 'guest',
   });
@@ -69,16 +75,28 @@ interface AuthScreenProps {
   loginPromptReason: string | null;
 }
 
-function AuthScreen({ config, errorScope, setErrorScope, isLoginPrompt, onDismiss, loginPromptReason }: AuthScreenProps) {
+function AuthScreen({
+  config,
+  errorScope,
+  setErrorScope,
+  isLoginPrompt,
+  onDismiss,
+  loginPromptReason,
+}: AuthScreenProps) {
   const { t } = useI18n();
   const { state } = useAuth();
 
   const primaryMethods = config.methods.filter(
-    (m): m is Exclude<LoginMethod, 'email' | 'guest' | 'global' | 'passkey'> => m !== 'email' && m !== 'guest' && m !== 'global' && m !== 'passkey',
+    (m): m is Exclude<LoginMethod, 'email' | 'guest' | 'global' | 'passkey'> =>
+      m !== 'email' && m !== 'guest' && m !== 'global' && m !== 'passkey',
   );
   const hasPasskey = config.methods.includes('passkey');
   const hasEmail = config.methods.includes('email');
-  const guestProvider = config.methods.includes('global') ? ('global' as const) : config.methods.includes('guest') ? ('guest' as const) : null;
+  const guestProvider = config.methods.includes('global')
+    ? ('global' as const)
+    : config.methods.includes('guest')
+      ? ('guest' as const)
+      : null;
   const hasGuest = guestProvider !== null;
 
   const errorFor = (scope: ErrorScope) =>
@@ -102,7 +120,9 @@ function AuthScreen({ config, errorScope, setErrorScope, isLoginPrompt, onDismis
               key={method}
               provider={method}
               disabled={state.isLoading}
-              onAttempt={() => { setErrorScope('primary'); }}
+              onAttempt={() => {
+                setErrorScope('primary');
+              }}
             />
           ))}
         </div>
@@ -117,8 +137,19 @@ function AuthScreen({ config, errorScope, setErrorScope, isLoginPrompt, onDismis
           <>
             {errorFor('passkey')}
             <div className="ikon-auth-buttons">
-              <LoginButton provider="passkey" disabled={state.isLoading} onAttempt={() => { setErrorScope('passkey'); }} />
-              <RegisterPasskeyButton disabled={state.isLoading} onAttempt={() => { setErrorScope('passkey'); }} />
+              <LoginButton
+                provider="passkey"
+                disabled={state.isLoading}
+                onAttempt={() => {
+                  setErrorScope('passkey');
+                }}
+              />
+              <RegisterPasskeyButton
+                disabled={state.isLoading}
+                onAttempt={() => {
+                  setErrorScope('passkey');
+                }}
+              />
             </div>
           </>
         )}
@@ -129,7 +160,14 @@ function AuthScreen({ config, errorScope, setErrorScope, isLoginPrompt, onDismis
           </div>
         )}
 
-        {hasEmail && <EmailLoginForm config={config} onAttempt={() => { setErrorScope('email'); }} />}
+        {hasEmail && (
+          <EmailLoginForm
+            config={config}
+            onAttempt={() => {
+              setErrorScope('email');
+            }}
+          />
+        )}
 
         {hasGuest && (primaryMethods.length > 0 || hasPasskey || hasEmail) && (
           <div className="ikon-auth-divider">
@@ -143,7 +181,9 @@ function AuthScreen({ config, errorScope, setErrorScope, isLoginPrompt, onDismis
             <LoginButton
               provider={guestProvider}
               disabled={state.isLoading}
-              onAttempt={() => { setErrorScope('guest'); }}
+              onAttempt={() => {
+                setErrorScope('guest');
+              }}
               {...(isLoginPrompt ? { onClick: onDismiss } : {})}
             />
           </>

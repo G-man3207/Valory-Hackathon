@@ -30,7 +30,8 @@ public sealed class ApprovalSms : IDisposable
         var from = Environment.GetEnvironmentVariable("ELKS_FROM");
         var oncall = Environment.GetEnvironmentVariable("ONCALL_PHONE");
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) ||
-            string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(oncall)) return null;
+            string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(oncall))
+            return null;
         if (!IsPhone(from) || !IsPhone(oncall) || username.Contains(':', StringComparison.Ordinal))
             throw new InvalidOperationException("SMS configuration is invalid; phone numbers must use E.164.");
         return new ApprovalSms(username, password, from, oncall);
@@ -42,12 +43,14 @@ public sealed class ApprovalSms : IDisposable
     public async Task SendAsync(ApprovalRequest approval, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(approval);
-        if (DateTimeOffset.UtcNow >= approval.ExpiresAt) throw new InvalidOperationException("Approval expired.");
+        if (DateTimeOffset.UtcNow >= approval.ExpiresAt)
+            throw new InvalidOperationException("Approval expired.");
         using var body = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["from"] = _from,
             ["to"] = _oncall,
-            ["message"] = $"Incident Commander DEMO: rollback deployment {approval.DeploymentId}. Reply APPROVE {approval.Code} or DENY {approval.Code} within 5 minutes."
+            ["message"] = $"Incident Commander DEMO: rollback deployment {approval.DeploymentId}. " +
+                $"Reply APPROVE {approval.Code} or DENY {approval.Code} within 5 minutes."
         });
         using var response = await _http.PostAsync("sms", body, token).ConfigureAwait(false);
         EnsureSuccess(response);
@@ -56,9 +59,12 @@ public sealed class ApprovalSms : IDisposable
     public async Task<bool?> GetDecisionAsync(ApprovalRequest approval, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(approval);
-        if (DateTimeOffset.UtcNow >= approval.ExpiresAt) return null;
+        if (DateTimeOffset.UtcNow >= approval.ExpiresAt)
+            return null;
         var since = approval.ExpiresAt.AddMinutes(-5).UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.ff", CultureInfo.InvariantCulture);
-        using var response = await _http.GetAsync($"sms?limit=100&to={Uri.EscapeDataString(_from)}&end={Uri.EscapeDataString(since)}", token).ConfigureAwait(false);
+        using var response = await _http.GetAsync(
+            $"sms?limit=100&to={Uri.EscapeDataString(_from)}&end={Uri.EscapeDataString(since)}",
+            token).ConfigureAwait(false);
         EnsureSuccess(response);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
         return ParseDecision(document.RootElement, approval, _oncall, _from, DateTimeOffset.UtcNow);
@@ -67,19 +73,24 @@ public sealed class ApprovalSms : IDisposable
     internal static bool? ParseDecision(JsonElement root, ApprovalRequest approval, string sender, string recipient, DateTimeOffset now)
     {
         if (now >= approval.ExpiresAt || root.ValueKind != JsonValueKind.Object ||
-            !root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return null;
+            !root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+            return null;
         // ponytail: one bounded history page; use authenticated webhook delivery if traffic reaches 100 replies per five minutes.
-        if (data.GetArrayLength() >= 100) return null;
+        if (data.GetArrayLength() >= 100)
+            return null;
         bool? decision = null;
         DateTimeOffset? first = null;
         foreach (var sms in data.EnumerateArray())
         {
             if (Text(sms, "direction") != "incoming" || Text(sms, "from") != sender || Text(sms, "to") != recipient ||
-                !DateTimeOffset.TryParse(Text(sms, "created"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var created) ||
-                created < approval.ExpiresAt.AddMinutes(-5) || created >= approval.ExpiresAt || created > now) continue;
+                !DateTimeOffset.TryParse(Text(sms, "created"), CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out var created) ||
+                created < approval.ExpiresAt.AddMinutes(-5) || created >= approval.ExpiresAt || created > now)
+                continue;
             var message = Text(sms, "message");
             bool? candidate = message == $"APPROVE {approval.Code}" ? true : message == $"DENY {approval.Code}" ? false : null;
-            if (candidate is null || (first is not null && created > first)) continue;
+            if (candidate is null || (first is not null && created > first))
+                continue;
             // A denial wins if conflicting replies have identical timestamps.
             decision = first == created && decision == false ? false : candidate;
             first = created;
@@ -92,7 +103,8 @@ public sealed class ApprovalSms : IDisposable
 
     private static void EnsureSuccess(HttpResponseMessage response)
     {
-        if (!response.IsSuccessStatusCode) throw new HttpRequestException("SMS provider request failed.", null, response.StatusCode);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException("SMS provider request failed.", null, response.StatusCode);
     }
 
     public void Dispose() => _http.Dispose();

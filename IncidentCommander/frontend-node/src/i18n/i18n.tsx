@@ -1,4 +1,8 @@
-import { I18nProvider as BaseI18nProvider, useI18n as useBaseI18n, type I18nContextValue } from '@ikonai/sdk-react-ui';
+import {
+  I18nProvider as BaseI18nProvider,
+  useI18n as useBaseI18n,
+  type I18nContextValue,
+} from '@ikonai/sdk-react-ui';
 import type { ReactNode } from 'react';
 
 export interface Translations {
@@ -50,9 +54,18 @@ export interface I18nProviderProps {
   detectLanguage?: boolean;
 }
 
-export function I18nProvider({ children, translations, defaultLanguage, detectLanguage }: I18nProviderProps) {
+export function I18nProvider({
+  children,
+  translations,
+  defaultLanguage,
+  detectLanguage,
+}: I18nProviderProps) {
   return (
-    <BaseI18nProvider translations={translations} {...(defaultLanguage === undefined ? {} : { defaultLanguage })} {...(detectLanguage === undefined ? {} : { detectLanguage })}>
+    <BaseI18nProvider
+      translations={translations}
+      {...(defaultLanguage === undefined ? {} : { defaultLanguage })}
+      {...(detectLanguage === undefined ? {} : { detectLanguage })}
+    >
       {children}
     </BaseI18nProvider>
   );

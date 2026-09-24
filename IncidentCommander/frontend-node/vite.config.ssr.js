@@ -18,8 +18,10 @@ function resolvePackageExport(specifier) {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
-  const isIkonInternal = (process.env.VITE_IS_IKON_INTERNAL || env.VITE_IS_IKON_INTERNAL) === 'true';
-  const platformTypescriptPath = process.env.VITE_IKON_PLATFORM_TYPESCRIPT_PATH || env.VITE_IKON_PLATFORM_TYPESCRIPT_PATH;
+  const isIkonInternal =
+    (process.env.VITE_IS_IKON_INTERNAL || env.VITE_IS_IKON_INTERNAL) === 'true';
+  const platformTypescriptPath =
+    process.env.VITE_IKON_PLATFORM_TYPESCRIPT_PATH || env.VITE_IKON_PLATFORM_TYPESCRIPT_PATH;
   const sourceMode = isIkonInternal && platformTypescriptPath;
 
   const standardPrerenderDir = sourceMode
@@ -31,7 +33,9 @@ export default defineConfig(({ mode }) => {
     : resolvePackageExport('@ikonai/sdk-react-ui-standard/prerender-entry');
 
   if (!entry) {
-    throw new Error('The installed @ikonai/sdk-react-ui-standard has no prerender entry; run `ikon app update` to update the SDK packages');
+    throw new Error(
+      'The installed @ikonai/sdk-react-ui-standard has no prerender entry; run `ikon app update` to update the SDK packages',
+    );
   }
 
   const workerStub = sourceMode
@@ -42,7 +46,9 @@ export default defineConfig(({ mode }) => {
   const defaultPrerenderModules = sourceMode
     ? resolve(standardPrerenderDir, 'prerender-modules-default.ts')
     : resolvePackageExport('@ikonai/sdk-react-ui-standard/prerender-modules-default');
-  const prerenderModules = existsSync(appPrerenderModules) ? appPrerenderModules : defaultPrerenderModules;
+  const prerenderModules = existsSync(appPrerenderModules)
+    ? appPrerenderModules
+    : defaultPrerenderModules;
 
   const alias = [];
 
@@ -71,7 +77,9 @@ export default defineConfig(({ mode }) => {
   return {
     // The app folder contract: static web files live in the app root's public/, one level above
     // frontend-node. An app not yet migrated (and the template project itself) keeps the default.
-    publicDir: existsSync(resolve(__dirname, '../public')) ? resolve(__dirname, '../public') : 'public',
+    publicDir: existsSync(resolve(__dirname, '../public'))
+      ? resolve(__dirname, '../public')
+      : 'public',
     plugins: [react()],
     resolve: {
       alias,

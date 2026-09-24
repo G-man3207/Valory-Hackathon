@@ -14,7 +14,10 @@ public record IncidentReport(string Markdown);
 [App]
 public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientParameters> app) : IAsyncDisposable
 {
-    private UI UI { get; } = new(app, new IkonTheme
+    private UI UI
+    {
+        get;
+    } = new(app, new IkonTheme
     {
         Mode = ThemeMode.Fixed,
         ["primary"] = "amber-400",
@@ -51,17 +54,24 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
 
     private async Task InjectAsync()
     {
-        if (!await _gate.WaitAsync(0)) { return; }
+        if (!await _gate.WaitAsync(0))
+        {
+            return;
+        }
         try
         {
-            if (_simulation.Phase != IncidentPhase.Healthy) { return; }
+            if (_simulation.Phase != IncidentPhase.Healthy)
+            {
+                return;
+            }
             _busy.Value = true;
             _error.Value = "";
             _simulation.Inject();
             _revision.Value++;
             await InvestigateAsync();
         }
-        catch (Exception ex) when (ex is EmergenceStoppedException or OperationCanceledException or InvalidOperationException or ArgumentException or JsonException)
+        catch (Exception ex) when (ex is EmergenceStoppedException or OperationCanceledException
+            or InvalidOperationException or ArgumentException or JsonException)
         {
             Log.Instance.Warning(ex, "Incident investigation failed");
             _error.Value = "Investigation could not finish. Reset the demo to try again.";
@@ -81,29 +91,55 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         for (var round = 0; round < 3; round++)
         {
             var observations = await RunRoleAsync<ObservationResult>("Observability",
-                "Collect supported facts without diagnosing. On the first round inspect metrics, logs, deployments and dependency health using tools. Never invent readings.",
+                "Collect supported facts without diagnosing. On the first round inspect metrics, logs, " +
+                "deployments and dependency health using tools. Never invent readings.",
                 JsonSerializer.Serialize(_evidence), true);
             if (observations.Facts is not { Length: > 0 and <= 12 } || observations.Facts.Any(string.IsNullOrWhiteSpace))
                 throw new InvalidOperationException("Invalid observation result.");
-            _observations.Value = string.Join("\n", observations.Facts.Select(fact => $"• {fact}"));
+            _observations.Value = string.Join("\n", observations.Facts.Select(fact => $"- {fact}"));
 
             var hypotheses = await RunRoleAsync<HypothesisResult>("Hypothesis",
-                "Rank 2–3 possible root causes using only supplied evidence. State support and uncertainty for each. Correlation is not proof. Do not invent percentages.", EvidenceContext());
-            if (hypotheses.Items is not { Length: >= 2 and <= 3 } || hypotheses.Items.Any(item => item is null || string.IsNullOrWhiteSpace(item.Title) || string.IsNullOrWhiteSpace(item.Support) || string.IsNullOrWhiteSpace(item.Uncertainty)))
+                "Rank 2–3 possible root causes using only supplied evidence. State support and uncertainty for " +
+                "each. Correlation is not proof. Do not invent percentages.", EvidenceContext());
+            if (hypotheses.Items is not { Length: >= 2 and <= 3 } ||
+                hypotheses.Items.Any(item => item is null ||
+                    string.IsNullOrWhiteSpace(item.Title) ||
+                    string.IsNullOrWhiteSpace(item.Support) ||
+                    string.IsNullOrWhiteSpace(item.Uncertainty)))
                 throw new InvalidOperationException("Invalid hypotheses.");
-            _hypotheses.Value = string.Join("\n\n", hypotheses.Items.Select((item, index) => $"{index + 1}. {item.Title}\n{item.Support}\nUncertainty: {item.Uncertainty}"));
+            _hypotheses.Value = string.Join("\n\n", hypotheses.Items.Select((item, index) =>
+                $"### {index + 1}. {item.Title}\n\n{item.Support}\n\n**Uncertainty:** {item.Uncertainty}"));
 
             var critique = await RunRoleAsync<CriticResult>("Critic",
-                "Challenge the leading diagnosis using actual evidence. Look for correlation mistaken for causality and missing connection ownership or dependency evidence. Do not manufacture contradictory timestamps. MissingEvidence should list blockers to a reversible, human-approved mitigation, not every unanswered root-cause question. Exact code-level proof can remain uncertain and be a follow-up in Assessment. Tools return fixed snapshots; source code and more detailed transaction logs are unavailable. Empty MissingEvidence is allowed when sufficient evidence exists for a reversible mitigation.",
+                "Challenge the leading diagnosis using actual evidence. Look for correlation mistaken for " +
+                "causality and missing connection ownership or dependency evidence. Do not manufacture " +
+                "contradictory timestamps. MissingEvidence should list blockers to a reversible, human-approved " +
+                "mitigation, not every unanswered root-cause question. Exact code-level proof can remain " +
+                "uncertain and be a follow-up in Assessment. Tools return fixed snapshots; source code and more " +
+                "detailed transaction logs are unavailable. Empty MissingEvidence is allowed when sufficient " +
+                "evidence exists for a reversible mitigation.",
                 EvidenceContext() + "\nHypotheses: " + JsonSerializer.Serialize(hypotheses));
-            if (string.IsNullOrWhiteSpace(critique.Assessment) || critique.MissingEvidence is null || critique.MissingEvidence.Any(string.IsNullOrWhiteSpace))
+            if (string.IsNullOrWhiteSpace(critique.Assessment) ||
+                critique.MissingEvidence is null ||
+                critique.MissingEvidence.Any(string.IsNullOrWhiteSpace))
                 throw new InvalidOperationException("Invalid critique.");
-            _critique.Value = critique.Assessment + "\n" + string.Join("\n", critique.MissingEvidence.Select(item => $"• {item}"));
+            _critique.Value = critique.Assessment + "\n\n" + string.Join("\n", critique.MissingEvidence.Select(item => $"- {item}"));
 
             var decision = await RunRoleAsync<CommanderResult>("Commander",
-                "Choose NextStep: investigate, propose_rollback, or escalate. For investigate choose an unread Tool from get_metrics, get_logs, get_recent_deployments, inspect_db_connections, get_dependency_health. Tools return fixed snapshots: rereading get_logs cannot produce detailed transaction logs, source code, or new evidence. Before proposing rollback you MUST inspect_db_connections to distinguish owners and evaluate the Critic. After reading relevant evidence, decide whether it supports a reversible rollback for human review; exact code-level proof is not required, but conflicting evidence must be addressed. If it does not support mitigation, escalate. A proposal is NOT execution. Never claim resolution. Use Tool empty for other decisions.",
-                $"Investigation round {round + 1} of 3.\n" + EvidenceContext() + "\nHypotheses: " + JsonSerializer.Serialize(hypotheses) + "\nCritic: " + JsonSerializer.Serialize(critique));
-            if (string.IsNullOrWhiteSpace(decision.Rationale)) throw new InvalidOperationException("Missing rationale.");
+                "Choose NextStep: investigate, propose_rollback, or escalate. For investigate choose an unread " +
+                "Tool from get_metrics, get_logs, get_recent_deployments, inspect_db_connections, " +
+                "get_dependency_health. Tools return fixed snapshots: rereading get_logs cannot produce " +
+                "detailed transaction logs, source code, or new evidence. Before proposing rollback you MUST " +
+                "inspect_db_connections to distinguish owners and evaluate the Critic. After reading relevant " +
+                "evidence, decide whether it supports a reversible rollback for human review; exact code-level " +
+                "proof is not required, but conflicting evidence must be addressed. If it does not support " +
+                "mitigation, escalate. A proposal is NOT execution. Never claim resolution. Use Tool empty for " +
+                "other decisions.",
+                $"Investigation round {round + 1} of 3.\n" + EvidenceContext() +
+                "\nHypotheses: " + JsonSerializer.Serialize(hypotheses) +
+                "\nCritic: " + JsonSerializer.Serialize(critique));
+            if (string.IsNullOrWhiteSpace(decision.Rationale))
+                throw new InvalidOperationException("Missing rationale.");
             _decision.Value = decision.Rationale;
             Record("Commander", decision.Rationale);
             switch (decision.NextStep)
@@ -130,7 +166,8 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
                             Record("SMS", "Delivery not confirmed; no automatic resend.");
                         }
                     }
-                    if (_simulation.PendingApproval is { } pending) _ = PollApprovalAsync(pending);
+                    if (_simulation.PendingApproval is { } pending)
+                        _ = PollApprovalAsync(pending);
                     return;
                 case "escalate":
                     _smsStatus.Value = "No approval SMS sent: investigation escalated without a rollback proposal.";
@@ -224,15 +261,18 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
             while (!_shutdown.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(3), _shutdown.Token);
-                if (_simulation.PendingApproval != approval) return;
+                if (_simulation.PendingApproval != approval)
+                    return;
                 if (DateTimeOffset.UtcNow >= approval.ExpiresAt)
                 {
                     await DecideAsync(approval.Code, false);
                     return;
                 }
-                if (_sms is null) continue;
+                if (_sms is null)
+                    continue;
                 var decision = await _sms.GetDecisionAsync(approval, _shutdown.Token);
-                if (_simulation.PendingApproval != approval) return;
+                if (_simulation.PendingApproval != approval)
+                    return;
                 if (decision is { } approved)
                 {
                     await DecideAsync(approval.Code, approved);
@@ -242,7 +282,8 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         }
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException)
         {
-            if (_simulation.PendingApproval != approval) return;
+            if (_simulation.PendingApproval != approval)
+                return;
             _smsStatus.Value = "SMS replies could not be checked. Local demo approval remains available.";
         }
     }
@@ -255,13 +296,19 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
         _revision.Value++;
         _simulation.VerifyRecovery();
         _revision.Value++;
-        _report.Value = $"# Incident {_simulation.Id}\n\nSimulated checkout incident. Human-approved rollback of {rejectedDeployment}.\n\nRecovery verified against error rate, latency and connection thresholds.\n\n{_decision.Value}";
+        _report.Value = $"# Incident {_simulation.Id}\n\n" +
+            $"Simulated checkout incident. Human-approved rollback of {rejectedDeployment}.\n\n" +
+            $"Recovery verified against error rate, latency and connection thresholds.\n\n{_decision.Value}";
         try
         {
             var report = await RunRoleAsync<IncidentReport>("Commander",
-                "Write a short Markdown incident report: impact, likely cause, evidence, human-approved mitigation, recovery and follow-up. Infrastructure is simulated. Do not overstate certainty or invent duration. Timeline and current metrics are authoritative.",
-                EvidenceContext() + "\nTimeline: " + JsonSerializer.Serialize(_simulation.Events) + "\nCurrent metrics: " + _simulation.ReadTool("get_metrics"));
-            if (!string.IsNullOrWhiteSpace(report.Markdown)) _report.Value = report.Markdown;
+                "Write a short Markdown incident report: impact, likely cause, evidence, human-approved " +
+                "mitigation, recovery and follow-up. Infrastructure is simulated. Do not overstate certainty or " +
+                "invent duration. Timeline and current metrics are authoritative.",
+                EvidenceContext() + "\nTimeline: " + JsonSerializer.Serialize(_simulation.Events) +
+                "\nCurrent metrics: " + _simulation.ReadTool("get_metrics"));
+            if (!string.IsNullOrWhiteSpace(report.Markdown))
+                _report.Value = report.Markdown;
         }
         catch (Exception ex) when (ex is EmergenceStoppedException or OperationCanceledException)
         {
@@ -280,16 +327,23 @@ public sealed partial class IncidentCommanderApp(IApp<SessionIdentity, ClientPar
 
     private async Task ResetAsync()
     {
-        if (!await _gate.WaitAsync(0)) { return; }
+        if (!await _gate.WaitAsync(0))
+        {
+            return;
+        }
         try
         {
             _simulation.Reset();
             _evidence.Clear();
-            _observations.Value = _hypotheses.Value = _critique.Value = _decision.Value = _report.Value = _error.Value = _smsStatus.Value = "";
+            _observations.Value = _hypotheses.Value = _critique.Value = _decision.Value =
+                _report.Value = _error.Value = _smsStatus.Value = "";
             _approvalCode.Value = "";
             _agent.Value = "Idle";
             _revision.Value++;
         }
-        finally { _gate.Release(); }
+        finally
+        {
+            _gate.Release();
+        }
     }
 }
